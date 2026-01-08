@@ -9,27 +9,11 @@ export interface Tool {
 
 export const tools: Tool[] = [
   {
-    id: 'test',
-    name: '测试工具',
-    description: '占位的测试工具，用于展示工具的基本结构。',
-    status: '开发中',
-    statusColor: 'blue',
-    href: '/tools/test'
-  },
-  {
-    id: 'another',
-    name: '另一个工具',
-    description: '占位测试工具，展示不同状态的工具卡片。',
-    status: '即将上线',
+    id: 'creep-designer',
+    name: 'Creep 设计器',
+    description: '计算和设计 Screeps 游戏中的 Creep 身体部件，支持多种部件类型和增强效果。',
+    status: '可用',
     statusColor: 'green',
-    href: '#'
-  },
-  {
-    id: 'planned',
-    name: '计划中的工具',
-    description: '计划中的工具，尚未开始开发。',
-    status: '规划中',
-    statusColor: 'gray',
-    href: '#'
+    href: '/tools/creep-designer'
   }
 ]
