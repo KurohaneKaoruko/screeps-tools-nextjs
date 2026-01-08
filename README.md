@@ -1,6 +1,20 @@
 # Screeps Tools
 
-一个为 Screeps 游戏玩家打造的实用工具集合。
+一个为 [Screeps](https://screeps.com) 游戏玩家打造的实用工具集合。
+
+## 功能
+
+### Creep 设计器
+
+设计和计算 Creep 身体部件配置：
+
+- 支持全部 8 种部件类型（tough、move、work、carry、attack、ranged_attack、heal、claim）
+- 完整的化合物增强系统，显示增强效果倍率
+- 实时计算孵化成本、HP、容量、攻击力等属性
+- 按控制器等级显示可用能量
+- 时间维度统计（每 Tick / 每小时 / 每天产出）
+- 部件可视化预览
+- Body Profile 导入/导出
 
 ## 技术栈
 
@@ -16,7 +30,7 @@ npm install
 npm run dev
 ```
 
-在浏览器中打开 [http://localhost:3000](http://localhost:3000) 查看结果。
+打开 [http://localhost:3000](http://localhost:3000) 查看。
 
 ## 构建
 
@@ -24,3 +38,7 @@ npm run dev
 npm run build
 npm start
 ```
+
+## License
+
+MIT

@@ -10,7 +10,8 @@ import {
   generateBodyProfile,
   BODY_PART_COSTS,
   CONTROLLER_LEVELS,
-  BOOSTS_FOR_PART
+  BOOSTS_FOR_PART,
+  BOOST_DESCRIPTIONS
 } from '@/lib/creep-calculator'
 
 export default function CreepDesignerPage() {
@@ -25,7 +26,10 @@ export default function CreepDesignerPage() {
     { type: 'claim', count: 0 }
   ])
   const [tickDuration, setTickDuration] = useState(1)
+  const [tickInputValue, setTickInputValue] = useState('1')
   const [controllerLevel, setControllerLevel] = useState(8)
+  const [importValue, setImportValue] = useState('')
+  const [importError, setImportError] = useState('')
 
   const stats = calculateCreepStats(parts, tickDuration)
   const timeStats = calculateTimeStats(stats, tickDuration)
@@ -54,10 +58,45 @@ export default function CreepDesignerPage() {
     setParts(parts.map(p => ({ ...p, count: 0, boost: undefined })))
   }
 
+  const importProfile = () => {
+    setImportError('')
+    try {
+      const parsed = JSON.parse(importValue.trim())
+      if (typeof parsed !== 'object' || parsed === null) {
+        setImportError('格式错误')
+        return
+      }
+      const newParts = parts.map(p => {
+        const count = parsed[p.type]
+        return {
+          ...p,
+          count: typeof count === 'number' ? Math.max(0, Math.min(50, Math.floor(count))) : 0,
+          boost: undefined
+        }
+      })
+      setParts(newParts)
+      setImportValue('')
+    } catch {
+      setImportError('JSON 解析失败')
+    }
+  }
+
   const bodyProfile = generateBodyProfile(parts)
-  const shareLink = typeof window !== 'undefined' 
-    ? `${window.location.origin}${window.location.pathname}?profile=${encodeURIComponent(bodyProfile)}`
-    : ''
+
+  const copyBodyProfile = async () => {
+    try {
+      await navigator.clipboard.writeText(bodyProfile)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = bodyProfile
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+  }
 
   const formatNumber = (num: number) => {
     if (!isFinite(num) || isNaN(num)) return '-'
@@ -124,7 +163,7 @@ export default function CreepDesignerPage() {
                     >
                       <option value="">无增强</option>
                       {BOOSTS_FOR_PART[part.type].map(boost => (
-                        <option key={boost} value={boost}>{boost}</option>
+                        <option key={boost} value={boost}>{boost} ({BOOST_DESCRIPTIONS[boost]})</option>
                       ))}
                     </select>
                   </div>
@@ -187,19 +226,38 @@ export default function CreepDesignerPage() {
           </div>
 
           {/* 右侧：统计面板 */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             {/* 设置 */}
-            <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600/50">
-              <div className="grid grid-cols-4 gap-3">
+            <div className="bg-gray-700/50 rounded-lg p-3 border border-gray-600/50">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="col-span-1">
                   <label className="text-xs text-gray-400 mb-1 block">Tick(秒)</label>
                   <input
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={tickDuration}
-                    onChange={(e) => setTickDuration(parseInt(e.target.value) || 1)}
-                    className="w-full h-9 px-2 bg-gray-600 border border-gray-500 rounded-md text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={tickInputValue}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (val === '' || /^\d+$/.test(val)) {
+                        setTickInputValue(val)
+                        const num = parseInt(val)
+                        if (num >= 1 && num <= 60) {
+                          setTickDuration(num)
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      const num = parseInt(tickInputValue)
+                      if (!num || num < 1) {
+                        setTickInputValue('1')
+                        setTickDuration(1)
+                      } else if (num > 60) {
+                        setTickInputValue('60')
+                        setTickDuration(60)
+                      }
+                    }}
+                    className="w-full h-8 px-2 bg-gray-600 border border-gray-500 rounded-md text-white text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div className="col-span-3">
@@ -207,7 +265,7 @@ export default function CreepDesignerPage() {
                   <select
                     value={controllerLevel}
                     onChange={(e) => setControllerLevel(parseInt(e.target.value))}
-                    className="w-full h-9 px-2 bg-gray-600 border border-gray-500 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full h-8 px-2 bg-gray-600 border border-gray-500 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {Object.entries(CONTROLLER_LEVELS).map(([level, energy]) => (
                       <option key={level} value={level}>
@@ -255,7 +313,7 @@ export default function CreepDesignerPage() {
                   <span className="text-lg font-bold text-orange-400">{stats.attack}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-400">远程</span>
+                  <span className="text-xs text-gray-400">远程攻击</span>
                   <span className="text-lg font-bold text-purple-400">{stats.rangedAttack}</span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -286,11 +344,29 @@ export default function CreepDesignerPage() {
                 {bodyProfile || '{}'}
               </div>
               <button
-                onClick={() => navigator.clipboard.writeText(shareLink)}
+                onClick={copyBodyProfile}
                 className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors text-sm"
               >
                 复制
               </button>
+              <div className="mt-3 pt-3 border-t border-gray-600">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={importValue}
+                    onChange={(e) => { setImportValue(e.target.value); setImportError('') }}
+                    placeholder='{"work":10,"move":5}'
+                    className="flex-1 h-9 px-2 bg-gray-600 border border-gray-500 rounded-md text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={importProfile}
+                    className="px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-md transition-colors text-sm"
+                  >
+                    导入
+                  </button>
+                </div>
+                {importError && <div className="text-xs text-red-400 mt-1">{importError}</div>}
+              </div>
             </div>
           </div>
         </div>

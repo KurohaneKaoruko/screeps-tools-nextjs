@@ -183,6 +183,49 @@ export const BOOSTS_FOR_PART: Record<BodyPartType, BoostType[]> = {
   claim: []
 }
 
+export const BOOST_DESCRIPTIONS: Record<BoostType, string> = {
+  // Attack
+  UH: '攻击×2',
+  UH2O: '攻击×3',
+  XUH2O: '攻击×4',
+  // Harvest
+  UO: '采集×3',
+  UHO2: '采集×5',
+  XUHO2: '采集×7',
+  // Carry
+  KH: '容量×2',
+  KH2O: '容量×3',
+  XKH2O: '容量×4',
+  // Ranged attack
+  KO: '远攻×2',
+  KHO2: '远攻×3',
+  XKHO2: '远攻×4',
+  // Build/repair
+  LH: '建造×1.5',
+  LH2O: '建造×1.8',
+  XLH2O: '建造×2',
+  // Heal
+  LO: '治疗×2',
+  LHO2: '治疗×3',
+  XLHO2: '治疗×4',
+  // Dismantle
+  ZH: '拆解×2',
+  ZH2O: '拆解×3',
+  XZH2O: '拆解×4',
+  // Move
+  ZO: '移动×2',
+  ZHO2: '移动×3',
+  XZHO2: '移动×4',
+  // Upgrade
+  GH: '升级×1.5',
+  GH2O: '升级×1.8',
+  XGH2O: '升级×2',
+  // Tough
+  GO: '减伤30%',
+  GHO2: '减伤50%',
+  XGHO2: '减伤70%'
+}
+
 export const CONTROLLER_LEVELS: Record<number, number> = {
   1: 300,
   2: 550,
