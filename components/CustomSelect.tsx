@@ -51,7 +51,7 @@ export default function CustomSelect({ value, onChange, options, disabled, place
 
   if (disabled) {
     return (
-      <div className="flex-1 h-8 px-2 bg-gray-700/40 border border-gray-600/50 rounded-lg text-gray-500 text-sm flex items-center cursor-not-allowed opacity-40">
+      <div className="flex-1 h-10 px-3 bg-gray-700/40 border border-gray-600/50 rounded-lg text-gray-500 text-sm flex items-center cursor-not-allowed opacity-40">
         {placeholder}
       </div>
     )
@@ -62,7 +62,7 @@ export default function CustomSelect({ value, onChange, options, disabled, place
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-8 px-2 pr-7 bg-gray-700/80 border border-gray-600/50 rounded-lg text-white text-sm text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/50 flex items-center"
+        className="w-full h-10 px-3 pr-8 bg-gray-700/80 border border-gray-600/50 rounded-lg text-white text-sm text-left focus:outline-none focus:ring-2 focus:ring-indigo-500/50 flex items-center"
       >
         <span className="truncate">{selectedOption?.label || placeholder}</span>
         <svg 

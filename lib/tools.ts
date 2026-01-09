@@ -15,5 +15,13 @@ export const tools: Tool[] = [
     status: '可用',
     statusColor: 'green',
     href: '/tools/creep-designer'
+  },
+  {
+    id: 'player-resources',
+    name: '玩家资源数据',
+    description: '通过玩家名查询 Screeps 玩家的资源数据，支持查询所有 shard 或单个 shard。',
+    status: '可用',
+    statusColor: 'green',
+    href: '/tools/player-resources'
   }
 ]
