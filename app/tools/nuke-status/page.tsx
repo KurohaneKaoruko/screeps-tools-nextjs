@@ -8,6 +8,8 @@ interface NukeData {
   launchRoomName: string
   landTime: number
   shard: string
+  targetOwner?: string
+  launchOwner?: string
 }
 
 interface NukeDataWithTime extends NukeData {
@@ -236,7 +238,7 @@ export default function NukeStatusPage() {
                         {shardNukes.length > 0 ? (
                           <div className="p-2 space-y-1.5">
                             {shardNukes.map((nuke, index) => (
-                              <div 
+                                <div 
                                 key={index} 
                                 className={`bg-gray-900/60 backdrop-blur-sm rounded-lg p-2 border transition-all hover:bg-gray-900/80 ${getUrgencyBorderColor(nuke.timeToLand)}`}
                               >
@@ -245,12 +247,20 @@ export default function NukeStatusPage() {
                                     <div className="flex items-center gap-1.5">
                                       <div className={`w-2 h-2 rounded-full shrink-0 ${getUrgencyBgColor(nuke.timeToLand)}`} />
                                       <div className="min-w-0">
-                                        <h3 className="text-xs font-semibold text-white truncate">{nuke.roomName}</h3>
+                                        <div className="flex items-center gap-1">
+                                          <h3 className="text-xs font-semibold text-white truncate">{nuke.roomName}</h3>
+                                          <span className={`text-xs truncate ${nuke.targetOwner ? 'text-cyan-400' : 'text-gray-500'}`}>
+                                            ({nuke.targetOwner || '未知'})
+                                          </span>
+                                        </div>
                                         <div className="flex items-center gap-1 text-xs text-gray-400">
                                           <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5-5M13 17l5 5m0 0l-5-5M6 7l-5 5m0 0l5-5M6 17l-5 5m0 0l5-5" />
                                           </svg>
                                           <span className="truncate">{nuke.launchRoomName}</span>
+                                          <span className={`truncate ${nuke.launchOwner ? 'text-orange-400' : 'text-gray-500'}`}>
+                                            ({nuke.launchOwner || '未知'})
+                                          </span>
                                         </div>
                                       </div>
                                     </div>
