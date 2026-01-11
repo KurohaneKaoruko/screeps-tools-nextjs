@@ -7,7 +7,7 @@ export default function Footer() {
 
         <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
           <p className="text-gray-300 text-xs">
-            Screeps Tools. 非官方社区开源项目。
+            Screeps Tools. 社区开源项目
           </p>
           <div className="flex items-center space-x-4">
             <a 

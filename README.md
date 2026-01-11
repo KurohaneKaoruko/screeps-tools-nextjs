@@ -2,9 +2,18 @@
 
 一个为 [Screeps](https://screeps.com) 游戏玩家打造的实用工具集合。
 
+![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-38B2AC?logo=tailwind-css)
+![License](https://img.shields.io/badge/License-MIT-green)
+
+## 在线访问
+
+🔗 [screeps-tools.vercel.app](https://screeps-tools.vercel.app) (如已部署)
+
 ## 功能
 
-### Creep 设计器
+### 🤖 Creep 设计器
 
 设计和计算 Creep 身体部件配置：
 
@@ -16,7 +25,7 @@
 - 部件可视化预览
 - Body Profile 导入/导出
 
-### 玩家资源查询
+### 📦 玩家资源查询
 
 查询玩家在各个 Shard 的资源分布情况：
 
@@ -30,31 +39,90 @@
   - 压缩资源（utrium_bar、lemergium_bar 等）
   - 高级资源（composite、crystal、liquid 等）
 - 资源数量自动格式化显示（K/M 单位）
-- 汇总显示 Energy 和 Power 总量
+
+### ☢️ Nuke 打击情况
+
+实时监控正在飞行的核弹：
+
+- 显示所有 Shard 的 Nuke 总数和紧急 Nuke 数量
+- 按 Shard 分组展示 Nuke 详情
+- 显示目标房间、发射房间及其所有者
+- 实时倒计时（tick 和真实时间）
+- 紧急程度颜色标识（红/橙/黄/绿）
+- 自动刷新（30秒间隔）
+- 点击房间名可直接跳转到 Screeps 游戏界面
+
+### ⚔️ PvP 战争情况
+
+查询服务器上的 PvP 战斗情况：
+
+- 自定义查询时间间隔（ticks）
+- 显示活跃 Shard 数、战斗房间数、正在战斗数
+- 显示各 Shard 的 Tick 速度
+- 按 Shard 分组展示战斗房间列表
+- 显示每个房间的最后战斗时间和距今 tick 数
+- 点击房间名可直接跳转到 Screeps 游戏界面
 
 ## 技术栈
 
-- Next.js 14
-- React 18
-- TypeScript
-- Tailwind CSS
+- **框架**: Next.js 15 (App Router)
+- **语言**: TypeScript 5
+- **样式**: Tailwind CSS 4
+- **运行时**: React 19
 
-## 开发
+## 本地开发
 
 ```bash
-npm install
-npm run dev
+# 安装依赖
+pnpm install
+
+# 启动开发服务器
+pnpm dev
 ```
 
 打开 [http://localhost:3000](http://localhost:3000) 查看。
 
-## 构建
+## 构建部署
 
 ```bash
-npm run build
-npm start
+# 构建生产版本
+pnpm build
+
+# 启动生产服务器
+pnpm start
 ```
+
+## API 说明
+
+项目通过 `/api/screeps` 路由代理 Screeps 官方 API，支持以下操作：
+
+| Action | 描述 | 参数 |
+|--------|------|------|
+| `nukes` | 获取所有 Shard 的 Nuke 数据 | - |
+| `pvp` | 获取 PvP 战斗数据 | `interval` (ticks) |
+| `resources` | 获取玩家资源数据 | `username`, `shard` (可选) |
+
+## 项目结构
+
+```
+├── app/
+│   ├── api/screeps/       # Screeps API 代理
+│   ├── tools/             # 工具页面
+│   │   ├── creep-designer/
+│   │   ├── nuke-status/
+│   │   ├── player-resources/
+│   │   └── pvp-status/
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/            # 通用组件
+├── lib/                   # 工具函数和配置
+└── public/
+```
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！
 
 ## License
 
-MIT
+[MIT](LICENSE)
