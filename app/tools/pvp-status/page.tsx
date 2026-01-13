@@ -5,6 +5,7 @@ import { useState } from 'react'
 interface PvPRoomData {
   _id: string
   lastPvpTime: number
+  owner?: string
 }
 
 interface PvPShardData {
@@ -206,15 +207,28 @@ export default function PvPStatusPage() {
                                     className="border-b border-[#5973ff]/5 hover:bg-[#2c467e]/20 transition-colors"
                                   >
                                     <td className="py-3 pl-3 pr-4">
-                                      <a 
-                                        href={`https://screeps.com/a/#!/room/${shard}/${room._id}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-white font-mono hover:text-[#5973ff] transition-colors"
-                                        title={`在 Screeps 中查看 ${room._id}`}
-                                      >
-                                        {room._id}
-                                      </a>
+                                      <div className="flex items-center gap-2">
+                                        <a 
+                                          href={`https://screeps.com/a/#!/room/${shard}/${room._id}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-white font-mono hover:text-[#5973ff] transition-colors"
+                                          title={`在 Screeps 中查看 ${room._id}`}
+                                        >
+                                          {room._id}
+                                        </a>
+                                        {room.owner && (
+                                          <a
+                                            href={`https://screeps.com/a/#!/profile/${room.owner}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-[#5973ff] bg-[#5973ff]/10 border border-[#5973ff]/30 px-1.5 py-0.5 rounded font-medium hover:bg-[#5973ff]/20 transition-colors"
+                                            title={`查看 ${room.owner} 的资料`}
+                                          >
+                                            {room.owner}
+                                          </a>
+                                        )}
+                                      </div>
                                     </td>
                                     <td className="py-3 px-4">
                                       <span className="text-[#909fc4]">{room.lastPvpTime.toLocaleString()}</span>

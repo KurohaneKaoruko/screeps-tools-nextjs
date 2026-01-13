@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+const SCREEPS_API_TOKEN = process.env.SCREEPS_API_TOKEN
+
 interface PlayerData {
   _id: string
   username: string
@@ -103,6 +105,10 @@ interface RoomOwnerCacheEntry {
 const roomOwnerCache = new Map<string, RoomOwnerCacheEntry>()
 const ROOM_OWNER_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
+// Shards 信息缓存
+let shardsInfoCache: { data: ShardsInfoResponse; timestamp: number } | null = null
+const SHARDS_INFO_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
 function getRoomOwnerCacheKey(shard: string, room: string): string {
   return `room_owner_${shard}_${room}`
 }
@@ -158,38 +164,34 @@ async function getRoomOwners(
       statName: 'owner0',
       shard
     }
-    console.log('map-stats request:', JSON.stringify(requestBody))
+    
+    const headers: HeadersInit = { 'Content-Type': 'application/json' }
+    if (SCREEPS_API_TOKEN) {
+      (headers as Record<string, string>)['X-Token'] = SCREEPS_API_TOKEN
+    }
     
     const response = await fetch('https://screeps.com/api/game/map-stats', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(requestBody),
       cache: 'no-store'
     })
 
     if (!response.ok) {
-      console.error(`map-stats API error: ${response.status}`, await response.text())
-      // 返回所有房间为 null（未知）
       rooms.forEach(room => { result[room] = null })
       return result
     }
 
     const data = await response.json()
     
-    console.log('map-stats raw response:', JSON.stringify(data))
-
     if (data.ok !== 1) {
-      console.error('map-stats API returned ok !== 1:', data)
       rooms.forEach(room => { result[room] = null })
       return result
     }
 
-    // 解析每个房间的所有者
     for (const room of rooms) {
       const roomStats = data.stats?.[room]
-      console.log(`Room ${room} stats:`, JSON.stringify(roomStats))
       
-      // 检查 own 字段 - 可能是 own.user 或直接是 own
       let userId: string | undefined
       if (roomStats?.own) {
         if (typeof roomStats.own === 'object' && roomStats.own.user) {
@@ -200,20 +202,15 @@ async function getRoomOwners(
       }
       
       if (userId) {
-        // 从 users map 中获取用户名
         const userInfo = data.users?.[userId]
-        console.log(`Room ${room} owner userId: ${userId}, userInfo:`, JSON.stringify(userInfo))
         result[room] = userInfo?.username || null
       } else {
-        // 无主房间
         result[room] = null
       }
     }
 
     return result
   } catch (error) {
-    console.error('getRoomOwners error:', error)
-    // 出错时返回所有房间为 null
     rooms.forEach(room => { result[room] = null })
     return result
   }
@@ -263,8 +260,6 @@ async function fetchRoomOwnersWithCache(
           result[`${shard}_${room}`] = owner
         }
       } catch (error) {
-        console.error(`fetchRoomOwnersWithCache error for shard ${shard}:`, error)
-        // 出错时设置为 null，但不缓存（下次重试）
         for (const room of shardRooms) {
           result[`${shard}_${room}`] = null
         }
@@ -305,14 +300,20 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000)
 
-async function fetchScreepsApi(url: string, useCache = true): Promise<any> {
+async function fetchScreepsApi(url: string, useCache = true, requireAuth = false): Promise<any> {
   if (useCache) {
     const cached = getCached(url)
     if (cached) return cached
   }
 
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+  
+  if (requireAuth && SCREEPS_API_TOKEN) {
+    (headers as Record<string, string>)['X-Token'] = SCREEPS_API_TOKEN
+  }
+
   const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     cache: 'no-store',
   })
   if (!response.ok) {
@@ -483,18 +484,22 @@ async function getNukes(shards: string[]): Promise<NukesResponse> {
     
     return { ok: 1, nukes: allNukes, shardGameTimes, shardTickSpeeds }
   } catch (error) {
-    console.error('获取 nuke 数据失败:', error)
     return { ok: 1, nukes: allNukes, shardGameTimes }
   }
 }
 
 async function getShardsInfo(): Promise<ShardsInfoResponse> {
+  if (shardsInfoCache && Date.now() - shardsInfoCache.timestamp < SHARDS_INFO_CACHE_TTL) {
+    return shardsInfoCache.data
+  }
+
   try {
     const url = 'https://screeps.com/api/game/shards/info'
     const data = await fetchScreepsApi(url) as ShardsInfoResponse
+    
+    shardsInfoCache = { data, timestamp: Date.now() }
     return data
   } catch (error) {
-    console.error('获取 shard 信息失败:', error)
     return { 
       ok: 0, 
       shards: [] 
@@ -516,9 +521,33 @@ async function getPvPData(interval: number): Promise<PvPResponse> {
       data.shardTickSpeeds = shardTickSpeeds
     }
     
+    if (data.ok === 1 && data.pvp) {
+      const roomsToQuery: { room: string; shard: string }[] = []
+      
+      for (const [shard, shardData] of Object.entries(data.pvp)) {
+        if (shardData?.rooms) {
+          for (const room of shardData.rooms) {
+            roomsToQuery.push({ room: room._id, shard })
+          }
+        }
+      }
+      
+      if (roomsToQuery.length > 0) {
+        const ownerData = await fetchRoomOwnersWithCache(roomsToQuery)
+        
+        for (const [shard, shardData] of Object.entries(data.pvp)) {
+          if (shardData?.rooms) {
+            for (const room of shardData.rooms) {
+              const ownerKey = `${shard}_${room._id}`
+              ;(room as any).owner = ownerData[ownerKey] ?? undefined
+            }
+          }
+        }
+      }
+    }
+    
     return data
   } catch (error) {
-    console.error('获取 PvP 数据失败:', error)
     return { 
       ok: 0, 
       pvp: {},
