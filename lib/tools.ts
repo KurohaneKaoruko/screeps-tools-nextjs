@@ -44,8 +44,8 @@ export const tools: Tool[] = [
     id: 'console',
     name: 'Screeps 控制台',
     description: '通过 API Token 连接 Screeps 控制台，直接在网页上执行代码。',
-    status: '开发中',
-    statusColor: 'blue',
+    status: '可用',
+    statusColor: 'green',
     href: '/tools/console'
   }
 ]

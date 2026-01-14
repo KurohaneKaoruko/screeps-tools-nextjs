@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { ScreepsApiClient } from '@/lib/screeps-client'
 import { useScreepsSocket } from '@/hooks/useScreepsSocket'
+import CustomSelect from '@/components/CustomSelect'
 
 interface ConsoleLog {
   _id?: string
@@ -361,20 +362,30 @@ export default function ConsolePage() {
                   <div>
                     <label className="text-xs text-[#909fc4] mb-1.5 block">已保存的 Token</label>
                     <div className="flex gap-2">
-                      <select
-                        value={selectedTokenIndex}
-                        onChange={handleSavedTokenSelect}
-                        className="flex-1 h-9 px-3 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
-                      >
-                        <option value={-1}>自定义 / 新增</option>
-                        {savedTokens.map((t, i) => (
-                          <option key={i} value={i}>{t.name}</option>
-                        ))}
-                      </select>
+                      <CustomSelect
+                        value={String(selectedTokenIndex)}
+                        onChange={(val) => {
+                          const index = parseInt(val)
+                          setSelectedTokenIndex(index)
+                          
+                          if (index >= 0) {
+                            const selectedToken = savedTokens[index]
+                            setToken(selectedToken.token)
+                            localStorage.setItem('screeps_token', selectedToken.token)
+                          } else {
+                            setToken('')
+                            localStorage.removeItem('screeps_token')
+                          }
+                        }}
+                        options={[
+                          { value: '-1', label: '自定义 / 新增' },
+                          ...savedTokens.map((t, i) => ({ value: String(i), label: t.name }))
+                        ]}
+                      />
                       {selectedTokenIndex >= 0 && (
                         <button
                           onClick={() => deleteToken(selectedTokenIndex)}
-                          className="px-3 h-9 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg text-xs transition-colors"
+                          className="px-3 h-10 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg text-xs transition-colors"
                         >
                           删除
                         </button>
@@ -454,24 +465,25 @@ export default function ConsolePage() {
                 <div>
                   <label className="text-xs text-[#909fc4] mb-1.5 block">Shard</label>
                   <div className="flex gap-2">
-                    <select
+                    <CustomSelect
                       value={['shard0', 'shard1', 'shard2', 'shard3'].includes(shard) ? shard : 'custom'}
-                      onChange={(e) => {
-                        if (e.target.value !== 'custom') {
-                          handleShardChange(e)
+                      onChange={(val) => {
+                        if (val !== 'custom') {
+                          setShard(val)
+                          localStorage.setItem('screeps_shard', val)
                         } else {
                           // 如果选择自定义，保持当前值（或清空），但让输入框显示
                           setShard('') 
                         }
                       }}
-                      className="flex-1 h-9 px-3 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
-                    >
-                      <option value="shard0">shard0</option>
-                      <option value="shard1">shard1</option>
-                      <option value="shard2">shard2</option>
-                      <option value="shard3">shard3</option>
-                      <option value="custom">自定义 / Season</option>
-                    </select>
+                      options={[
+                        { value: 'shard0', label: 'shard0' },
+                        { value: 'shard1', label: 'shard1' },
+                        { value: 'shard2', label: 'shard2' },
+                        { value: 'shard3', label: 'shard3' },
+                        { value: 'custom', label: '自定义 / Season' }
+                      ]}
+                    />
                   </div>
                   {/* 如果 shard 不在标准列表中，或者用户选择了自定义（虽然 select value 逻辑会处理，但这里提供一个显式的输入框） */}
                   {!['shard0', 'shard1', 'shard2', 'shard3'].includes(shard) && (
@@ -493,7 +505,7 @@ export default function ConsolePage() {
                       <button
                         onClick={handleSpectatorConnect}
                         disabled={!targetUsername.trim()}
-                        className={`w-full h-9 rounded-lg text-xs font-medium transition-colors ${
+                        className={`w-full h-9 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
                             targetUsername.trim()
                             ? 'bg-[#5973ff]/20 hover:bg-[#5973ff]/30 text-[#5973ff] border border-[#5973ff]/30'
                             : 'bg-[#909fc4]/10 text-[#909fc4]/30 border border-[#909fc4]/10 cursor-not-allowed'

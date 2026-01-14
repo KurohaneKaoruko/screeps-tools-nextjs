@@ -326,7 +326,7 @@ export default function CreepDesignerPage() {
             {/* Body Profile */}
             <div className="bg-[#1d2027]/60 backdrop-blur-sm rounded-md p-4 border border-[#5973ff]/10">
               <div className="text-xs text-[#909fc4] mb-2">Body Profile</div>
-              <div className="bg-[#0b0d0f]/80 rounded-lg p-3 text-xs font-mono break-all mb-3 min-h-[2rem] border border-[#5973ff]/10">
+              <div className="bg-[#0b0d0f]/80 rounded-lg p-3 text-xs font-mono break-all mb-3 min-h-8 border border-[#5973ff]/10">
                 {bodyProfile || '{}'}
               </div>
               <button onClick={copyBodyProfile} className="w-full px-4 py-2.5 btn-primary rounded-lg text-sm font-medium text-white">
