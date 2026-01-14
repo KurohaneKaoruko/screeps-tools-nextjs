@@ -134,11 +134,11 @@ export default function NukeStatusPage() {
     <div className="min-h-screen screeps-bg">
       <div className="grid-bg" />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8">
-        <div className="mb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-8">
+        <div className="mb-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-white">Nuke 打击情况</h1>
+              <h1 className="text-xl font-bold text-white">Nuke 打击情况</h1>
             </div>
             <button
               onClick={fetchData}
@@ -175,7 +175,7 @@ export default function NukeStatusPage() {
                       </svg>
                     </div>
                   </div>
-                  <div className="text-2xl font-bold text-white">{totalNukes}</div>
+                  <div className="text-xl font-bold text-white">{totalNukes}</div>
                   <div className="text-xs text-[#909fc4]/60 mt-1">所有 Shard</div>
                 </div>
 
@@ -188,7 +188,7 @@ export default function NukeStatusPage() {
                       </svg>
                     </div>
                   </div>
-                  <div className={`text-2xl font-bold ${urgentNukes > 0 ? 'text-[#ff7379]' : 'text-green-500'}`}>
+                  <div className={`text-xl font-bold ${urgentNukes > 0 ? 'text-[#ff7379]' : 'text-green-500'}`}>
                     {urgentNukes}
                   </div>
                   <div className="text-xs text-[#909fc4]/60 mt-1">5分钟内爆炸</div>

@@ -27,10 +27,10 @@ export default function ToolsPage() {
               <div className="flex items-center p-6">
                 <div className={`absolute left-0 top-0 bottom-0 w-0.5 ${
                   tool.statusColor === 'green' 
-                    ? 'bg-gradient-to-b from-green-500 to-emerald-400' 
+                    ? 'bg-linear-to-b from-green-500 to-emerald-400' 
                     : tool.statusColor === 'blue'
-                    ? 'bg-gradient-to-b from-[#5973ff] to-[#a459ff]'
-                    : 'bg-gradient-to-b from-[#909fc4]/50 to-[#909fc4]/30'
+                    ? 'bg-linear-to-b from-[#5973ff] to-[#a459ff]'
+                    : 'bg-linear-to-b from-[#909fc4]/50 to-[#909fc4]/30'
                 }`} />
                 
                 <div className="flex-1 ml-4">

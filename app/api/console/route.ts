@@ -30,3 +30,28 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export async function GET(request: NextRequest) {
+  try {
+    const token = request.headers.get('X-Token')
+    if (!token) {
+      return NextResponse.json({ ok: 0, error: 'Missing API Token' }, { status: 401 })
+    }
+
+    const api = new ScreepsServerApi(token)
+    const info = await api.getMe()
+    
+    if (!info.ok) {
+        return NextResponse.json({ ok: 0, error: 'Failed to get user info' }, { status: 400 })
+    }
+
+    return NextResponse.json({ ok: 1, _id: info._id, username: info.username })
+  } catch (error) {
+    console.error('Console Proxy Error (GET):', error)
+    return NextResponse.json(
+      { ok: 0, error: error instanceof Error ? error.message : 'Internal Proxy Error' },
+      { status: 500 }
+    )
+  }
+}
+

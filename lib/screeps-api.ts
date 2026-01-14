@@ -19,6 +19,10 @@ export class ScreepsServerApi {
     // Shard casting due to loose typing in library vs strict in TS
     return this.api.console(expression, shard as Shard)
   }
+
+  async getMe(): Promise<any> {
+    return this.api.getMyInfo()
+  }
   
   // You can add other server-side helper methods here if needed
 }

@@ -248,9 +248,9 @@ export default function PlayerResourcesPage() {
     <div className="min-h-screen screeps-bg">
       <div className="grid-bg" />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white">查询资源</h1>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12">
+        <div className="mb-4">
+          <h1 className="text-xl font-bold text-white">查询资源</h1>
         </div>
 
         <div className="space-y-4">

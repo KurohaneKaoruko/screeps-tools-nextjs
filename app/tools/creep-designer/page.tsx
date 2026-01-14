@@ -111,11 +111,11 @@ export default function CreepDesignerPage() {
     <div className="min-h-screen screeps-bg">
       <div className="grid-bg" />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Creep 设计器</h1>
+            <h1 className="text-xl font-bold text-white">Creep 设计器</h1>
           </div>
           <button
             onClick={resetAll}
@@ -319,7 +319,7 @@ export default function CreepDesignerPage() {
             <div className={`rounded-md p-4 border ${isOverBudget ? 'bg-[#ff7379]/10 border-[#ff7379]/30' : 'bg-[#1d2027]/60 border-[#5973ff]/10'}`}>
               <div className="flex justify-between items-center">
                 <span className="text-xs text-[#909fc4]">剩余能量 (Lv.{controllerLevel})</span>
-                <span className={`text-xl font-bold ${isOverBudget ? 'text-[#ff7379]' : 'text-green-400'}`}>{remainingEnergy}</span>
+                <span className={`text-lg font-bold ${isOverBudget ? 'text-[#ff7379]' : 'text-green-400'}`}>{remainingEnergy}</span>
               </div>
             </div>
 

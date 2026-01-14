@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ScreepsApiClient } from '@/lib/screeps-client'
-
+import { useScreepsSocket } from '@/hooks/useScreepsSocket'
 
 interface ConsoleLog {
   _id?: string
   message: string
+
   error?: boolean
   timestamp: number
   shard?: string
@@ -17,21 +18,57 @@ interface SavedToken {
   token: string
 }
 
+interface SavedCommand {
+  id: string
+  name: string
+  command: string
+  timestamp: number
+}
+
 export default function ConsolePage() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSavedCommandsOpen, setIsSavedCommandsOpen] = useState(false)
   const [token, setToken] = useState('')
   const [savedTokens, setSavedTokens] = useState<SavedToken[]>([])
+  const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([])
   const [tokenName, setTokenName] = useState('')
+  const [commandName, setCommandName] = useState('')
   const [selectedTokenIndex, setSelectedTokenIndex] = useState<number | -1>(-1)
   const [shard, setShard] = useState('shard0')
   const [command, setCommand] = useState('')
+  const [connectionMode, setConnectionMode] = useState<'self' | 'spectator'>('self')
+  const [targetUsername, setTargetUsername] = useState('')
+
   const [logs, setLogs] = useState<ConsoleLog[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [showToken, setShowToken] = useState(false)
   const logsEndRef = useRef<HTMLDivElement>(null)
+  
+  const { status, connect, disconnect } = useScreepsSocket((newLogs) => {
+    setLogs(prev => {
+        // 转换 Hook 中的日志格式到组件的日志格式
+        const mappedLogs = newLogs.map(l => ({
+            message: l.line,
+            error: l.error,
+            timestamp: l.timestamp,
+            shard: l.shard
+        }))
+        return [...prev, ...mappedLogs]
+    })
+  }, (err) => {
+      // 连接错误回调
+      setLogs(prev => [...prev, {
+          message: `连接失败: ${err.message}`,
+          error: true,
+          timestamp: Date.now()
+      }])
+  })
 
   useEffect(() => {
+
     const savedToken = localStorage.getItem('screeps_token')
+
     if (savedToken) {
       setToken(savedToken)
     }
@@ -50,13 +87,37 @@ export default function ConsolePage() {
         console.error('Failed to parse saved tokens', e)
       }
     }
+    const storedCommands = localStorage.getItem('screeps_saved_commands')
+    if (storedCommands) {
+      try {
+        const parsed = JSON.parse(storedCommands)
+        if (Array.isArray(parsed)) {
+          setSavedCommands(parsed)
+        }
+      } catch (e) {
+        console.error('Failed to parse saved commands', e)
+      }
+    }
   }, [])
 
+
+  // Auto-connect when token changes
   useEffect(() => {
-    if (logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    if (token) {
+      if (connectionMode === 'self') {
+        connect(token)
+      } else if (connectionMode === 'spectator' && targetUsername) {
+        const timer = setTimeout(() => {
+            connect(token, targetUsername)
+        }, 800)
+        return () => clearTimeout(timer)
+      }
+    } else {
+      disconnect()
     }
-  }, [logs])
+  }, [token, connectionMode, targetUsername, connect, disconnect])
+
+
 
   const handleTokenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newToken = e.target.value
@@ -108,7 +169,36 @@ export default function ConsolePage() {
     localStorage.setItem('screeps_shard', newShard)
   }
 
+  const saveCommand = () => {
+    if (!commandName.trim() || !command.trim()) return
+    
+    const newCommand: SavedCommand = {
+      id: Date.now().toString(),
+      name: commandName,
+      command: command,
+      timestamp: Date.now()
+    }
+
+    const newSavedCommands = [newCommand, ...savedCommands]
+    setSavedCommands(newSavedCommands)
+    localStorage.setItem('screeps_saved_commands', JSON.stringify(newSavedCommands))
+    setCommandName('')
+  }
+
+  const deleteCommand = (id: string) => {
+    const newSavedCommands = savedCommands.filter(c => c.id !== id)
+    setSavedCommands(newSavedCommands)
+    localStorage.setItem('screeps_saved_commands', JSON.stringify(newSavedCommands))
+  }
+
+  const loadCommand = (cmd: string) => {
+      setCommand(cmd)
+  }
+
   const executeCommand = async () => {
+
+    if (connectionMode === 'spectator') return
+
     if (!token) {
       setError('请输入 API Token')
       return
@@ -139,27 +229,10 @@ export default function ConsolePage() {
             timestamp: Date.now(),
             shard: shard
         }])
-      } else {
-        // The response usually contains 'ok': 1, and maybe 'result' if any?
-        // Actually /user/console POST returns { ok: 1, result: ... } or just { ok: 1 }
-        // The logs usually come from polling, but the immediate result is also returned?
-        // Let's inspect what data returns.
-        if (data.result) {
-             setLogs(prev => [...prev, {
-                message: typeof data.result === 'object' ? JSON.stringify(data.result, null, 2) : String(data.result),
-                timestamp: Date.now(),
-                shard: shard
-            }])
-        } else {
-             setLogs(prev => [...prev, {
-                message: 'Command sent successfully (no immediate return value)',
-                timestamp: Date.now(),
-                shard: shard
-            }])
-        }
       }
       
       setCommand('')
+
     } catch (err: any) {
       setError(err.message || '执行出错')
       setLogs(prev => [...prev, {
@@ -188,19 +261,49 @@ export default function ConsolePage() {
     <div className="min-h-screen screeps-bg">
       <div className="grid-bg" />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 rounded-lg bg-[#1d2027]/60 border border-[#5973ff]/10 text-[#909fc4] hover:text-white hover:bg-[#5973ff]/10 transition-colors"
+              title={isSidebarOpen ? "收起侧边栏" : "展开侧边栏"}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {isSidebarOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
             <h1 className="text-2xl font-bold text-white">Screeps 控制台</h1>
+            <div className="flex items-center gap-2 px-3 py-1 bg-[#1d2027]/60 rounded-full border border-[#5973ff]/10">
+              <div className={`w-2 h-2 rounded-full ${
+                status === 'connected' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' :
+                status === 'connecting' || status === 'authenticating' ? 'bg-yellow-500 animate-pulse' :
+                status === 'error' ? 'bg-red-500' :
+                'bg-gray-500'
+              }`} />
+              <span className="text-xs text-[#909fc4]">
+                {status === 'connected' ? '已连接' :
+                 status === 'connecting' ? '连接中...' :
+                 status === 'authenticating' ? '认证中...' :
+                 status === 'error' ? '连接错误' :
+                 '未连接'}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-4 gap-6">
+
+        <div className="flex gap-6 items-start">
           {/* Left: Settings */}
-          <div className="lg:col-span-1 space-y-4">
+          <div className={`${isSidebarOpen ? 'w-80 opacity-100' : 'w-0 opacity-0 overflow-hidden'} transition-all duration-300 ease-in-out shrink-0`}>
+            <div className="w-80 space-y-4">
             <div className="bg-[#1d2027]/60 backdrop-blur-sm rounded-md p-4 border border-[#5973ff]/10">
-              <h3 className="text-[#e5e7eb] font-semibold mb-4 text-sm">连接设置</h3>
+              <h3 className="text-[#e5e7eb] font-semibold mb-4 text-xs">连接设置</h3>
               
               <div className="space-y-4">
                 {/* Saved Tokens Dropdown */}
@@ -289,6 +392,50 @@ export default function ConsolePage() {
                   </div>
                 )}
 
+                {/* Connection Mode */}
+                <div>
+                  <label className="text-xs text-[#909fc4] mb-1.5 block">连接模式</label>
+                  <div className="flex gap-2 p-1 bg-[#161724]/50 rounded-lg border border-[#5973ff]/10">
+                    <button
+                      onClick={() => {
+                          setConnectionMode('self')
+                          setTargetUsername('')
+                      }}
+                      className={`flex-1 py-1.5 text-xs rounded-md transition-colors ${
+                        connectionMode === 'self' 
+                          ? 'bg-[#5973ff]/20 text-white shadow-sm' 
+                          : 'text-[#909fc4] hover:text-[#e5e7eb]'
+                      }`}
+                    >
+                      当前用户
+                    </button>
+                    <button
+                      onClick={() => setConnectionMode('spectator')}
+                      className={`flex-1 py-1.5 text-xs rounded-md transition-colors ${
+                        connectionMode === 'spectator' 
+                          ? 'bg-[#5973ff]/20 text-white shadow-sm' 
+                          : 'text-[#909fc4] hover:text-[#e5e7eb]'
+                      }`}
+                    >
+                      观察模式
+                    </button>
+                  </div>
+                </div>
+
+                {/* Target Username (Spectator Mode) */}
+                {connectionMode === 'spectator' && (
+                    <div>
+                      <label className="text-xs text-[#909fc4] mb-1.5 block">目标用户名</label>
+                      <input
+                        type="text"
+                        value={targetUsername}
+                        onChange={(e) => setTargetUsername(e.target.value)}
+                        placeholder="输入要观察的玩家用户名"
+                        className="w-full h-9 px-3 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
+                      />
+                    </div>
+                )}
+
                 <div>
                   <label className="text-xs text-[#909fc4] mb-1.5 block">Shard</label>
                   <div className="flex gap-2">
@@ -327,20 +474,12 @@ export default function ConsolePage() {
                 </div>
               </div>
             </div>
-
-            <div className="bg-[#1d2027]/60 backdrop-blur-sm rounded-md p-4 border border-[#5973ff]/10">
-              <h3 className="text-[#e5e7eb] font-semibold mb-2 text-sm">使用说明</h3>
-              <ul className="text-xs text-[#909fc4] space-y-2 list-disc pl-4">
-                <li>输入 JS 代码并按 Enter 执行</li>
-                <li>Shift + Enter 换行</li>
-                <li>支持执行任意 Screeps 游戏内代码</li>
-                <li>Game.time, Game.creeps 等全局对象可用</li>
-              </ul>
             </div>
           </div>
 
           {/* Right: Console Area */}
-          <div className="lg:col-span-3 flex flex-col h-[600px] bg-[#1d2027]/60 backdrop-blur-sm rounded-md border border-[#5973ff]/10 overflow-hidden">
+
+          <div className="flex-1 flex flex-col h-[calc(100vh-200px)] min-h-[600px] bg-[#1d2027]/60 backdrop-blur-sm rounded-md border border-[#5973ff]/10 overflow-hidden">
             {/* Toolbar */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-[#5973ff]/10 bg-[#161724]/50">
               <div className="flex items-center gap-2">
@@ -366,31 +505,121 @@ export default function ConsolePage() {
               {logs.map((log, index) => (
                 <div key={index} className={`break-all ${log.error ? 'text-[#ff7379]' : 'text-[#e5e7eb]'}`}>
                   <span className="text-[#909fc4]/50 text-xs mr-2">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-                  {log.message}
+                  <span className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: log.message }} />
                 </div>
+
               ))}
               <div ref={logsEndRef} />
             </div>
 
+
             {/* Input */}
-            <div className="p-4 border-t border-[#5973ff]/10 bg-[#161724]/30">
-              <div className="relative">
+            <div className="border-t border-[#5973ff]/10 bg-[#161724]/30 relative">
+               {/* Saved Commands Toolbar */}
+               <div className="flex items-center justify-between px-4 py-2 border-b border-[#5973ff]/5">
+                  <div className="flex-1" /> {/* Spacer */}
+                  <button 
+                     onClick={() => setIsSavedCommandsOpen(!isSavedCommandsOpen)}
+                     className="flex items-center gap-2 text-xs text-[#909fc4] hover:text-white transition-colors"
+                  >
+                     常用命令
+                     <svg className={`w-3 h-3 transition-transform ${isSavedCommandsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                     </svg>
+                  </button>
+               </div>
+
+               {/* Saved Commands Panel - Floating */}
+               {isSavedCommandsOpen && (
+                 <div className="absolute bottom-full right-0 w-80 mb-2 mr-4 p-4 rounded-lg bg-[#161724]/95 backdrop-blur-md border border-[#5973ff]/20 shadow-xl z-10">
+                    <div className="space-y-4">
+                       <div className="flex items-center justify-between border-b border-[#5973ff]/10 pb-2 mb-2">
+                           <h3 className="text-xs font-semibold text-white">已保存命令</h3>
+                           <button onClick={() => setIsSavedCommandsOpen(false)} className="text-[#909fc4] hover:text-white">
+                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                               </svg>
+                           </button>
+                       </div>
+                       
+                       <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {savedCommands.map((cmd) => (
+                              <div key={cmd.id || Math.random().toString()} className="flex items-center justify-between bg-[#1d2027] p-2 rounded text-xs border border-[#5973ff]/10 group">
+                                  <span 
+                                      className="text-[#909fc4] hover:text-white cursor-pointer truncate flex-1"
+                                      onClick={() => {
+                                          loadCommand(cmd.command)
+                                          setIsSavedCommandsOpen(false)
+                                      }}
+                                      title={cmd.command}
+                                  >
+                                      {cmd.name}
+                                  </span>
+                                  <button 
+                                      onClick={(e) => {
+                                          e.stopPropagation()
+                                          deleteCommand(cmd.id)
+                                      }}
+                                      className="text-red-500/50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-2 px-1"
+                                  >
+                                      ×
+                                  </button>
+                              </div>
+                          ))}
+                          {savedCommands.length === 0 && (
+                              <div className="text-[#909fc4]/40 text-xs text-center py-2">
+                                  暂无保存的命令
+                              </div>
+                          )}
+                       </div>
+
+                       <div className="pt-2 border-t border-[#5973ff]/10">
+                           <div className="flex gap-2">
+                             <input
+                               type="text"
+                               value={commandName}
+                               onChange={(e) => setCommandName(e.target.value)}
+                               placeholder="当前代码命名..."
+                               className="flex-1 h-8 px-3 bg-[#1d2027] border border-[#5973ff]/20 rounded text-white text-xs focus:outline-none focus:ring-1 focus:ring-[#5973ff]/50"
+                             />
+                             <button
+                               type="button"
+                               onClick={saveCommand}
+                               disabled={!commandName.trim() || !command.trim()}
+                               className={`px-3 h-8 rounded text-xs transition-colors border ${
+                                 commandName.trim() && command.trim()
+                                   ? 'bg-[#5973ff]/10 hover:bg-[#5973ff]/20 text-[#5973ff] border-[#5973ff]/20 cursor-pointer'
+                                   : 'bg-[#909fc4]/5 text-[#909fc4]/30 border-[#909fc4]/10 cursor-not-allowed'
+                               }`}
+                             >
+                               保存
+                             </button>
+                           </div>
+                       </div>
+                    </div>
+                 </div>
+               )}
+
+              <div className="p-4 relative">
                 <textarea
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="输入代码..."
-                  className="w-full h-24 bg-[#0b0d0f]/50 border border-[#5973ff]/20 rounded-lg p-3 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50 resize-none"
+                  disabled={connectionMode === 'spectator'}
+                  placeholder={connectionMode === 'spectator' ? "观察模式下无法输入命令" : "输入代码..."}
+                  className={`w-full h-24 bg-[#0b0d0f]/50 border border-[#5973ff]/20 rounded-lg p-3 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50 resize-none ${
+                    connectionMode === 'spectator' ? 'cursor-not-allowed opacity-50' : ''
+                  }`}
                 />
-                <div className="absolute right-2 bottom-2 flex gap-2">
-                  <span className="text-[10px] text-[#909fc4]/40 self-center hidden sm:block">
+                <div className="absolute right-2 bottom-2 flex gap-2 items-center">
+                  <span className="text-[10px] text-[#909fc4]/40 hidden sm:block whitespace-nowrap">
                     Shift + Enter 换行
                   </span>
                   <button
                     onClick={executeCommand}
-                    disabled={isLoading || !token}
-                    className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      isLoading || !token
+                    disabled={isLoading || !token || connectionMode === 'spectator'}
+                    className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                      isLoading || !token || connectionMode === 'spectator'
                         ? 'bg-[#909fc4]/10 text-[#909fc4]/50 cursor-not-allowed'
                         : 'btn-primary text-white hover:shadow-lg hover:shadow-[#5973ff]/20'
                     }`}
