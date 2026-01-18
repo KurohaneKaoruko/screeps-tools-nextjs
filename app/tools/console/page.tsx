@@ -56,12 +56,73 @@ function sanitizeConsoleHtml(raw: string): string {
     'UL',
     'OL',
     'LI',
-    'STYLE'
+    'LABEL',
+    'INPUT'
   ])
-  const allowedStyleProps = new Set(['color', 'background-color', 'font-weight', 'font-style', 'text-decoration'])
+  const allowedStyleProps = new Set([
+    'color',
+    'background-color',
+    'font-weight',
+    'font-style',
+    'text-decoration',
+    'display',
+    'flex-flow',
+    'padding',
+    'margin',
+    'width',
+    'min-width',
+    'max-width',
+    'height',
+    'max-height',
+    'overflow',
+    'transition',
+    'cursor',
+    'white-space',
+    'text-overflow',
+    'align-items',
+    'flex',
+    'flex-direction',
+    'flex-wrap',
+    'justify-content'
+  ])
 
   const template = document.createElement('template')
   template.innerHTML = raw
+
+  // Extract and inject style tags into document head
+  const styleTags = template.content.querySelectorAll('style')
+  styleTags.forEach(styleEl => {
+    const css = styleEl.textContent || ''
+    const lowered = css.toLowerCase()
+    
+    // Security check
+    if (
+      lowered.includes('@import') ||
+      lowered.includes('expression') ||
+      lowered.includes('javascript:') ||
+      lowered.includes('url(')
+    ) {
+      styleEl.remove()
+      return
+    }
+
+    // Create a unique ID for this style block to avoid duplicates
+    const styleId = `screeps-console-style-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    
+    // Check if we already have this exact style
+    const existingStyle = Array.from(document.head.querySelectorAll('style[data-screeps-console]'))
+      .find(s => s.textContent === css)
+    
+    if (!existingStyle) {
+      const newStyle = document.createElement('style')
+      newStyle.setAttribute('data-screeps-console', styleId)
+      newStyle.textContent = css
+      document.head.appendChild(newStyle)
+    }
+    
+    // Remove the style tag from the content
+    styleEl.remove()
+  })
 
   const sanitizeElement = (el: Element) => {
     const tag = el.tagName.toUpperCase()
@@ -77,26 +138,23 @@ function sanitizeConsoleHtml(raw: string): string {
 
     const originalClass = (el as HTMLElement).getAttribute('class')
     const originalStyle = (el as HTMLElement).getAttribute('style')
-    const originalText = tag === 'STYLE' ? el.textContent || '' : ''
+    const originalType = tag === 'INPUT' ? (el as HTMLInputElement).getAttribute('type') : ''
+    const originalId = (el as HTMLElement).getAttribute('id')
+    const originalFor = tag === 'LABEL' ? (el as HTMLElement).getAttribute('for') : ''
 
     for (const attr of Array.from(el.attributes)) {
       el.removeAttribute(attr.name)
     }
 
-    if (tag === 'STYLE') {
-      const css = originalText
-      const lowered = css.toLowerCase()
-      if (
-        lowered.includes('@import') ||
-        lowered.includes('expression') ||
-        lowered.includes('javascript:') ||
-        lowered.includes('url(')
-      ) {
-        el.remove()
-        return
-      }
-      el.textContent = css
-      return
+    // Preserve input type and id for checkbox functionality
+    if (tag === 'INPUT' && originalType) {
+      ;(el as HTMLInputElement).setAttribute('type', originalType)
+    }
+    if (originalId && /^[a-zA-Z0-9_-]+$/.test(originalId)) {
+      ;(el as HTMLElement).setAttribute('id', originalId)
+    }
+    if (tag === 'LABEL' && originalFor && /^[a-zA-Z0-9_-]+$/.test(originalFor)) {
+      ;(el as HTMLElement).setAttribute('for', originalFor)
     }
 
     if (originalClass) {
@@ -118,6 +176,7 @@ function sanitizeConsoleHtml(raw: string): string {
         if (!allowedStyleProps.has(prop)) continue
         const lowered = value.toLowerCase()
         if (lowered.includes('url(') || lowered.includes('expression') || lowered.includes('javascript:')) continue
+        // Allow more characters for layout properties
         if (!/^[#(),.%\s\w-]+$/.test(value)) continue
         sanitized.push(`${prop}:${value}`)
       }
@@ -334,6 +393,14 @@ export default function ConsolePage() {
       }
     }
   }, [logs, autoScroll])
+
+  // Cleanup injected styles on unmount
+  useEffect(() => {
+    return () => {
+      const styles = document.head.querySelectorAll('style[data-screeps-console]')
+      styles.forEach(style => style.remove())
+    }
+  }, [])
 
   // Auto-connect when token changes
   useEffect(() => {
