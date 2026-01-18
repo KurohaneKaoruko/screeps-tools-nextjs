@@ -173,7 +173,6 @@ export default function ConsolePage() {
   const commandInputRef = useRef<HTMLTextAreaElement>(null)
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsPanelRef = useRef<HTMLDivElement>(null)
-  const [settingsPosition, setSettingsPosition] = useState<{ top: number; left: number } | null>(null)
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false)
@@ -272,30 +271,6 @@ export default function ConsolePage() {
       }
     }
   }, [token, targetUsername, connectionMode])
-
-  useEffect(() => {
-    if (!isSidebarOpen) return
-
-    const update = () => {
-      const btn = settingsButtonRef.current
-      if (!btn) return
-      const rect = btn.getBoundingClientRect()
-      const preferredWidth = settingsPanelRef.current?.offsetWidth ?? 320
-      const margin = 16
-      const maxLeft = Math.max(margin, window.innerWidth - preferredWidth - margin)
-      const left = Math.min(Math.max(rect.left, margin), maxLeft)
-      const top = Math.min(rect.bottom + 8, window.innerHeight - margin)
-      setSettingsPosition({ top, left })
-    }
-
-    update()
-    window.addEventListener('resize', update)
-    window.addEventListener('scroll', update, true)
-    return () => {
-      window.removeEventListener('resize', update)
-      window.removeEventListener('scroll', update, true)
-    }
-  }, [isSidebarOpen])
 
   useEffect(() => {
     if (!isSidebarOpen) return
@@ -562,20 +537,243 @@ export default function ConsolePage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <button
-              ref={settingsButtonRef}
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-lg bg-[#1d2027]/60 border border-[#5973ff]/10 text-[#909fc4] hover:text-white hover:bg-[#5973ff]/10 transition-colors"
-              title={isSidebarOpen ? "收起侧边栏" : "展开侧边栏"}
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {isSidebarOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
+            <div className="relative">
+              <button
+                ref={settingsButtonRef}
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="relative z-30 p-2 rounded-lg bg-[#1d2027]/60 border border-[#5973ff]/10 text-[#909fc4] hover:text-white hover:bg-[#5973ff]/10 transition-colors"
+                title={isSidebarOpen ? "收起侧边栏" : "展开侧边栏"}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {isSidebarOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+
+              {isSidebarOpen && (
+                <div ref={settingsPanelRef} className="absolute left-0 top-full z-20 w-80 max-w-[calc(100vw-2rem)]">
+                  <div className="bg-[#1d2027]/90 backdrop-blur-md rounded-md p-4 border border-[#5973ff]/20 shadow-xl">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-[#e5e7eb] font-semibold text-xs">连接设置</h3>
+                      <button
+                        type="button"
+                        onClick={() => setIsSidebarOpen(false)}
+                        className="text-[#909fc4] hover:text-white transition-colors"
+                        title="关闭"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="space-y-4 max-h-[calc(100vh-160px)] overflow-auto pr-1">
+                      <div>
+                        <div className="flex gap-2 p-1 bg-[#161724]/50 rounded-lg border border-[#5973ff]/10">
+                          <button
+                            onClick={() => {
+                              setConnectionMode('self')
+                              setTargetUsername('')
+                            }}
+                            className={`flex-1 py-1.5 text-xs rounded-md transition-colors ${
+                              connectionMode === 'self'
+                                ? 'bg-[#5973ff]/20 text-white shadow-sm'
+                                : 'text-[#909fc4] hover:text-[#e5e7eb]'
+                            }`}
+                          >
+                            Token 模式
+                          </button>
+                          {enableSpectatorMode && (
+                            <button
+                              onClick={() => setConnectionMode('spectator')}
+                              className={`flex-1 py-1.5 text-xs rounded-md transition-colors ${
+                                connectionMode === 'spectator'
+                                  ? 'bg-[#5973ff]/20 text-white shadow-sm'
+                                  : 'text-[#909fc4] hover:text-[#e5e7eb]'
+                              }`}
+                            >
+                              观察模式
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {connectionMode === 'spectator' && (
+                        <div>
+                          <label className="text-xs text-[#909fc4] mb-1.5 block">目标用户名</label>
+                          <input
+                            type="text"
+                            value={targetUsername}
+                            onChange={(e) => setTargetUsername(e.target.value)}
+                            placeholder="输入要观察的玩家用户名"
+                            className="w-full h-9 px-3 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
+                          />
+                        </div>
+                      )}
+
+                      {connectionMode === 'self' && savedTokens.length > 0 && (
+                        <div>
+                          <label className="text-xs text-[#909fc4] mb-1.5 block">已保存的 Token</label>
+                          <div className="flex gap-2">
+                            <CustomSelect
+                              value={String(selectedTokenIndex)}
+                              onChange={(val) => {
+                                const index = parseInt(val)
+                                setSelectedTokenIndex(index)
+                                if (index >= 0) {
+                                  const selectedToken = savedTokens[index]
+                                  setToken(selectedToken.token)
+                                  localStorage.setItem('screeps_token', selectedToken.token)
+                                } else {
+                                  setToken('')
+                                  localStorage.removeItem('screeps_token')
+                                }
+                              }}
+                              options={[
+                                { value: '-1', label: '自定义 / 新增' },
+                                ...savedTokens.map((t, i) => ({ value: String(i), label: t.name }))
+                              ]}
+                            />
+                            {selectedTokenIndex >= 0 && (
+                              <button
+                                onClick={() => deleteToken(selectedTokenIndex)}
+                                className="px-3 h-10 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg text-xs transition-colors"
+                              >
+                                删除
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {connectionMode === 'self' && (
+                        <div>
+                          <label className="text-xs text-[#909fc4] mb-1.5 block">API Token</label>
+                          <div className="relative">
+                            <input
+                              type={showToken ? "text" : "password"}
+                              value={token}
+                              onChange={handleTokenChange}
+                              placeholder="请输入您的 API Token"
+                              className="w-full h-9 px-3 pr-10 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowToken(!showToken)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#909fc4] hover:text-white"
+                            >
+                              {showToken ? (
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-[#909fc4]/60 mt-1">
+                            Token 将保存在您的浏览器 LocalStorage 中
+                          </p>
+                        </div>
+                      )}
+
+                      {connectionMode === 'self' && selectedTokenIndex === -1 && token && (
+                        <div className="pt-2 border-t border-[#5973ff]/10">
+                          <label className="text-xs text-[#909fc4] mb-1.5 block">保存为常用 Token</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={tokenName}
+                              onChange={(e) => setTokenName(e.target.value)}
+                              placeholder="给 Token 起个名字"
+                              className="flex-1 h-9 px-3 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
+                            />
+                            <button
+                              onClick={saveToken}
+                              disabled={!tokenName.trim()}
+                              className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm transition-colors border ${
+                                tokenName.trim()
+                                  ? 'bg-[#5973ff]/10 hover:bg-[#5973ff]/20 text-[#5973ff] border-[#5973ff]/20 cursor-pointer'
+                                  : 'bg-[#909fc4]/5 text-[#909fc4]/30 border-[#909fc4]/10 cursor-not-allowed'
+                              }`}
+                              title="保存"
+                            >
+                              💾
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="text-xs text-[#909fc4] mb-1.5 block">Shard</label>
+                        <div className="flex gap-2">
+                          <CustomSelect
+                            value={['shard0', 'shard1', 'shard2', 'shard3'].includes(shard) ? shard : 'custom'}
+                            onChange={(val) => {
+                              if (val !== 'custom') {
+                                setShard(val)
+                                localStorage.setItem('screeps_shard', val)
+                                setLogs(prev => [...prev, {
+                                    message: `[System] Command target switched to ${val}`,
+                                    timestamp: Date.now(),
+                                    shard: val
+                                }])
+                              } else {
+                                setShard('')
+                              }
+                            }}
+                            options={[
+                              { value: 'shard0', label: 'shard0' },
+                              { value: 'shard1', label: 'shard1' },
+                              { value: 'shard2', label: 'shard2' },
+                              { value: 'shard3', label: 'shard3' },
+                              { value: 'custom', label: '自定义 / Season' }
+                            ]}
+                          />
+                        </div>
+                        {!['shard0', 'shard1', 'shard2', 'shard3'].includes(shard) && (
+                          <input
+                            type="text"
+                            value={shard}
+                            onChange={(e) => {
+                               setShard(e.target.value)
+                               localStorage.setItem('screeps_shard', e.target.value)
+                            }}
+                            placeholder="输入 Shard 名称 (如 season)"
+                            className="w-full h-9 px-3 mt-2 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
+                          />
+                        )}
+                      </div>
+
+                      {connectionMode === 'spectator' && (
+                        <div>
+                          <button
+                            onClick={handleSpectatorConnect}
+                            disabled={!targetUsername.trim()}
+                            className={`w-full h-9 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                              targetUsername.trim()
+                                ? 'bg-[#5973ff]/20 hover:bg-[#5973ff]/30 text-[#5973ff] border border-[#5973ff]/30'
+                                : 'bg-[#909fc4]/10 text-[#909fc4]/30 border border-[#909fc4]/10 cursor-not-allowed'
+                            }`}
+                          >
+                            连接控制台
+                          </button>
+                          <p className="text-[10px] text-[#909fc4]/60 mt-2">
+                            观察模式仅能查看日志，无法执行命令。<br/>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             <h1 className="text-2xl font-bold text-white">Screeps 控制台</h1>
             <div className="flex items-center gap-2 px-3 py-1 bg-[#1d2027]/60 rounded-full border border-[#5973ff]/10">
               <div className={`w-2 h-2 rounded-full ${
@@ -597,248 +795,6 @@ export default function ConsolePage() {
 
 
         <div className="relative">
-          {isSidebarOpen && (
-            <div
-              ref={settingsPanelRef}
-              style={{
-                position: 'fixed',
-                top: settingsPosition?.top ?? 80,
-                left: settingsPosition?.left ?? 16
-              }}
-              className="z-20 w-80 max-w-[calc(100vw-2rem)]"
-            >
-              <div className="bg-[#1d2027]/90 backdrop-blur-md rounded-md p-4 border border-[#5973ff]/20 shadow-xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-[#e5e7eb] font-semibold text-xs">连接设置</h3>
-                  <button
-                    type="button"
-                    onClick={() => setIsSidebarOpen(false)}
-                    className="text-[#909fc4] hover:text-white transition-colors"
-                    title="关闭"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="space-y-4 max-h-[calc(100vh-160px)] overflow-auto pr-1">
-                {/* Connection Mode */}
-                <div>
-                  <div className="flex gap-2 p-1 bg-[#161724]/50 rounded-lg border border-[#5973ff]/10">
-                    <button
-                      onClick={() => {
-                          setConnectionMode('self')
-                          setTargetUsername('')
-                      }}
-                      className={`flex-1 py-1.5 text-xs rounded-md transition-colors ${
-                        connectionMode === 'self' 
-                          ? 'bg-[#5973ff]/20 text-white shadow-sm' 
-                          : 'text-[#909fc4] hover:text-[#e5e7eb]'
-                      }`}
-                    >
-                      Token 模式
-                    </button>
-                    {enableSpectatorMode && (
-                      <button
-                        onClick={() => setConnectionMode('spectator')}
-                        className={`flex-1 py-1.5 text-xs rounded-md transition-colors ${
-                          connectionMode === 'spectator' 
-                            ? 'bg-[#5973ff]/20 text-white shadow-sm' 
-                            : 'text-[#909fc4] hover:text-[#e5e7eb]'
-                        }`}
-                      >
-                        观察模式
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Target Username (Spectator Mode) */}
-                {connectionMode === 'spectator' && (
-                    <div>
-                      <label className="text-xs text-[#909fc4] mb-1.5 block">目标用户名</label>
-                      <input
-                        type="text"
-                        value={targetUsername}
-                        onChange={(e) => setTargetUsername(e.target.value)}
-                        placeholder="输入要观察的玩家用户名"
-                        className="w-full h-9 px-3 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
-                      />
-                    </div>
-                )}
-
-                {/* Saved Tokens Dropdown */}
-                {connectionMode === 'self' && savedTokens.length > 0 && (
-                  <div>
-                    <label className="text-xs text-[#909fc4] mb-1.5 block">已保存的 Token</label>
-                    <div className="flex gap-2">
-                      <CustomSelect
-                        value={String(selectedTokenIndex)}
-                        onChange={(val) => {
-                          const index = parseInt(val)
-                          setSelectedTokenIndex(index)
-                          
-                          if (index >= 0) {
-                            const selectedToken = savedTokens[index]
-                            setToken(selectedToken.token)
-                            localStorage.setItem('screeps_token', selectedToken.token)
-                          } else {
-                            setToken('')
-                            localStorage.removeItem('screeps_token')
-                          }
-                        }}
-                        options={[
-                          { value: '-1', label: '自定义 / 新增' },
-                          ...savedTokens.map((t, i) => ({ value: String(i), label: t.name }))
-                        ]}
-                      />
-                      {selectedTokenIndex >= 0 && (
-                        <button
-                          onClick={() => deleteToken(selectedTokenIndex)}
-                          className="px-3 h-10 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg text-xs transition-colors"
-                        >
-                          删除
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Token Input Section - Hide in Spectator Mode */}
-                {connectionMode === 'self' && (
-                <div>
-                  <label className="text-xs text-[#909fc4] mb-1.5 block">API Token</label>
-                  <div className="relative">
-                    <input
-                      type={showToken ? "text" : "password"}
-                      value={token}
-                      onChange={handleTokenChange}
-                      placeholder="请输入您的 API Token"
-                      className="w-full h-9 px-3 pr-10 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowToken(!showToken)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[#909fc4] hover:text-white"
-                    >
-                      {showToken ? (
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-[#909fc4]/60 mt-1">
-                    Token 将保存在您的浏览器 LocalStorage 中
-                  </p>
-                </div>
-                )}
-
-                {/* Save Token Section */}
-                {connectionMode === 'self' && selectedTokenIndex === -1 && token && (
-                  <div className="pt-2 border-t border-[#5973ff]/10">
-                    <label className="text-xs text-[#909fc4] mb-1.5 block">保存为常用 Token</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={tokenName}
-                        onChange={(e) => setTokenName(e.target.value)}
-                        placeholder="给 Token 起个名字"
-                        className="flex-1 h-9 px-3 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
-                      />
-                      <button
-                        onClick={saveToken}
-                        disabled={!tokenName.trim()}
-                        className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm transition-colors border ${
-                          tokenName.trim()
-                            ? 'bg-[#5973ff]/10 hover:bg-[#5973ff]/20 text-[#5973ff] border-[#5973ff]/20 cursor-pointer'
-                            : 'bg-[#909fc4]/5 text-[#909fc4]/30 border-[#909fc4]/10 cursor-not-allowed'
-                        }`}
-                        title="保存"
-                      >
-                        💾
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Connection Mode */}
-                {/* Removed from bottom, moved to top */}
-                {/* Target Username (Spectator Mode) */}
-                {/* Removed from bottom, moved to top */}
-
-                <div>
-                  <label className="text-xs text-[#909fc4] mb-1.5 block">Shard</label>
-                  <div className="flex gap-2">
-                    <CustomSelect
-                      value={['shard0', 'shard1', 'shard2', 'shard3'].includes(shard) ? shard : 'custom'}
-                      onChange={(val) => {
-                        if (val !== 'custom') {
-                          setShard(val)
-                          localStorage.setItem('screeps_shard', val)
-                          setLogs(prev => [...prev, {
-                              message: `[System] Command target switched to ${val}`,
-                              timestamp: Date.now(),
-                              shard: val
-                          }])
-                        } else {
-                          // 如果选择自定义，保持当前值（或清空），但让输入框显示
-                          setShard('') 
-                        }
-                      }}
-                      options={[
-                        { value: 'shard0', label: 'shard0' },
-                        { value: 'shard1', label: 'shard1' },
-                        { value: 'shard2', label: 'shard2' },
-                        { value: 'shard3', label: 'shard3' },
-                        { value: 'custom', label: '自定义 / Season' }
-                      ]}
-                    />
-                  </div>
-                  {/* 如果 shard 不在标准列表中，或者用户选择了自定义（虽然 select value 逻辑会处理，但这里提供一个显式的输入框） */}
-                  {!['shard0', 'shard1', 'shard2', 'shard3'].includes(shard) && (
-                    <input
-                      type="text"
-                      value={shard}
-                      onChange={(e) => {
-                         setShard(e.target.value)
-                         localStorage.setItem('screeps_shard', e.target.value)
-                      }}
-                      placeholder="输入 Shard 名称 (如 season)"
-                      className="w-full h-9 px-3 mt-2 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50"
-                    />
-                  )}
-                </div>
-
-                {connectionMode === 'spectator' && (
-                    <div>
-                      <button
-                        onClick={handleSpectatorConnect}
-                        disabled={!targetUsername.trim()}
-                        className={`w-full h-9 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
-                            targetUsername.trim()
-                            ? 'bg-[#5973ff]/20 hover:bg-[#5973ff]/30 text-[#5973ff] border border-[#5973ff]/30'
-                            : 'bg-[#909fc4]/10 text-[#909fc4]/30 border border-[#909fc4]/10 cursor-not-allowed'
-                        }`}
-                      >
-                        连接控制台
-                      </button>
-                      <p className="text-[10px] text-[#909fc4]/60 mt-2">
-                        观察模式仅能查看日志，无法执行命令。<br/>
-                      </p>
-                    </div>
-                )}
-              </div>
-            </div>
-          </div>
-          )}
-
           <div className="flex-1 flex flex-col h-[calc(100vh-200px)] min-h-[600px] bg-[#1d2027]/60 backdrop-blur-sm rounded-md border border-[#5973ff]/10 overflow-hidden">
             {/* Toolbar */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-[#5973ff]/10 bg-[#161724]/50">
