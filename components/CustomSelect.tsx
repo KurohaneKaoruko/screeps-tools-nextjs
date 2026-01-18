@@ -139,7 +139,7 @@ export default function CustomSelect({ value, onChange, options, disabled, place
         ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full h-10 px-3 pr-8 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm text-left focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50 flex items-center"
+        className="w-full h-10 px-3 pr-8 bg-[#1d2027] border border-[#5973ff]/20 rounded-lg text-white text-sm text-left focus:outline-none focus:ring-1 focus:ring-inset focus:ring-[#5973ff]/50 flex items-center"
       >
         <span className="truncate">{selectedOption?.label || placeholder}</span>
         <svg 
