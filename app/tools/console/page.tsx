@@ -34,6 +34,78 @@ interface SavedCommand {
   timestamp: number
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function sanitizeConsoleHtml(raw: string): string {
+  if (!raw) return ''
+  if (typeof document === 'undefined') return escapeHtml(raw)
+  if (!raw.includes('<')) return escapeHtml(raw)
+
+  const allowedTags = new Set(['SPAN', 'BR', 'B', 'I', 'U', 'S', 'CODE', 'PRE'])
+  const allowedStyleProps = new Set(['color', 'background-color', 'font-weight', 'font-style', 'text-decoration'])
+
+  const template = document.createElement('template')
+  template.innerHTML = raw
+
+  const sanitizeElement = (el: Element) => {
+    const tag = el.tagName.toUpperCase()
+    if (!allowedTags.has(tag)) {
+      el.replaceWith(document.createTextNode(el.textContent || ''))
+      return
+    }
+
+    const originalStyle = tag === 'SPAN' ? (el as HTMLElement).getAttribute('style') : null
+    for (const attr of Array.from(el.attributes)) {
+      el.removeAttribute(attr.name)
+    }
+
+    if (tag === 'SPAN') {
+      const styleAttr = originalStyle
+      if (styleAttr) {
+        const sanitized: string[] = []
+        for (const part of styleAttr.split(';')) {
+          const [rawProp, ...rawValParts] = part.split(':')
+          const prop = (rawProp || '').trim().toLowerCase()
+          const value = rawValParts.join(':').trim()
+          if (!prop || !value) continue
+          if (!allowedStyleProps.has(prop)) continue
+          const lowered = value.toLowerCase()
+          if (lowered.includes('url(') || lowered.includes('expression') || lowered.includes('javascript:')) continue
+          if (!/^[#(),.%\s\w-]+$/.test(value)) continue
+          sanitized.push(`${prop}:${value}`)
+        }
+        if (sanitized.length > 0) {
+          ;(el as HTMLElement).setAttribute('style', sanitized.join(';'))
+        }
+      }
+    }
+  }
+
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.COMMENT_NODE) {
+      node.parentNode?.removeChild(node)
+      return
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as Element
+      const children = Array.from(el.childNodes)
+      sanitizeElement(el)
+      if (!el.isConnected) return
+      for (const child of children) walk(child)
+    }
+  }
+
+  for (const child of Array.from(template.content.childNodes)) walk(child)
+  return template.innerHTML
+}
+
 export default function ConsolePage() {
   const MAX_HISTORY_LOGS = 2000
   const MAX_COMMAND_HISTORY = 200
@@ -62,6 +134,7 @@ export default function ConsolePage() {
   const [connectionInstanceId, setConnectionInstanceId] = useState(0)
   const identityDebounceTimeoutRef = useRef<number | null>(null)
   const historyPersistTimeoutRef = useRef<number | null>(null)
+  const connectStartedAtRef = useRef<number>(0)
   const commandInputRef = useRef<HTMLTextAreaElement>(null)
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([])
@@ -178,9 +251,12 @@ export default function ConsolePage() {
     if (!connectionInstanceId) return
     if (!identityKey) return
 
-    setLogs([])
     const history = readConsoleHistory(identityKey, MAX_HISTORY_LOGS)
-    setLogs(history)
+    const startedAt = connectStartedAtRef.current
+    setLogs(prev => {
+      const recent = startedAt ? prev.filter(l => l.timestamp >= startedAt) : []
+      return [...history, ...recent]
+    })
   }, [connectionInstanceId, identityKey])
 
   useEffect(() => {
@@ -246,6 +322,8 @@ export default function ConsolePage() {
   useEffect(() => {
     if (connectionMode === 'self') {
         if (token) {
+            connectStartedAtRef.current = Date.now()
+            setLogs([])
             connect(token)
         } else {
             disconnect()
@@ -261,6 +339,8 @@ export default function ConsolePage() {
       if (!enableSpectatorMode) return
       
       if (connectionMode === 'spectator' && targetUsername) {
+          connectStartedAtRef.current = Date.now()
+          setLogs([])
           // 观察模式完全不传 Token
           connect('', targetUsername)
       }
@@ -758,7 +838,10 @@ export default function ConsolePage() {
               {logs.map((log, index) => (
                 <div key={index} className={`break-all ${log.error ? 'text-[#ff7379]' : 'text-[#e5e7eb]'}`}>
                   <span className="text-[#909fc4]/50 text-xs mr-2">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-                  <span className="whitespace-pre-wrap">{log.message}</span>
+                  <span
+                    className="whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{ __html: sanitizeConsoleHtml(log.message) }}
+                  />
                 </div>
 
               ))}
