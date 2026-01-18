@@ -4,6 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import { ScreepsApiClient } from '@/lib/screeps-client'
 import { useScreepsSocket } from '@/hooks/useScreepsSocket'
 import CustomSelect from '@/components/CustomSelect'
+import {
+  clearConsoleHistory,
+  addCommandToHistory,
+  computeConsoleIdentityKey,
+  readCommandHistory,
+  readConsoleHistory,
+  writeConsoleHistory
+} from '@/lib/console-storage'
 
 interface ConsoleLog {
   _id?: string
@@ -27,6 +35,10 @@ interface SavedCommand {
 }
 
 export default function ConsolePage() {
+  const MAX_HISTORY_LOGS = 2000
+  const MAX_COMMAND_HISTORY = 200
+  const MAX_SUGGESTIONS = 8
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isSavedCommandsOpen, setIsSavedCommandsOpen] = useState(false)
   const [token, setToken] = useState('')
@@ -46,6 +58,15 @@ export default function ConsolePage() {
   const [showToken, setShowToken] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
   const logsContainerRef = useRef<HTMLDivElement>(null)
+  const [identityKey, setIdentityKey] = useState('')
+  const [connectionInstanceId, setConnectionInstanceId] = useState(0)
+  const identityDebounceTimeoutRef = useRef<number | null>(null)
+  const historyPersistTimeoutRef = useRef<number | null>(null)
+  const commandInputRef = useRef<HTMLTextAreaElement>(null)
+  const [commandHistory, setCommandHistory] = useState<string[]>([])
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false)
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0)
   
   // Environment variable to control spectator mode availability
   // Default to false if not specified (only enable if explicitly set to 'true')
@@ -106,6 +127,107 @@ export default function ConsolePage() {
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    if (identityDebounceTimeoutRef.current) {
+      window.clearTimeout(identityDebounceTimeoutRef.current)
+      identityDebounceTimeoutRef.current = null
+    }
+
+    const source =
+      connectionMode === 'self'
+        ? token.trim()
+        : (targetUsername || '').trim()
+
+    if (!source) {
+      setIdentityKey('')
+      return
+    }
+
+    identityDebounceTimeoutRef.current = window.setTimeout(() => {
+      ;(async () => {
+        const prefix = connectionMode === 'self' ? 'self:' : 'spectator:'
+        const key = await computeConsoleIdentityKey(prefix + source)
+        if (cancelled) return
+        setIdentityKey(key)
+      })()
+    }, 250)
+
+    return () => {
+      cancelled = true
+      if (identityDebounceTimeoutRef.current) {
+        window.clearTimeout(identityDebounceTimeoutRef.current)
+        identityDebounceTimeoutRef.current = null
+      }
+    }
+  }, [token, targetUsername, connectionMode])
+
+  useEffect(() => {
+    if (status === 'connected') setConnectionInstanceId(Date.now())
+  }, [status])
+
+  useEffect(() => {
+    if (!identityKey) {
+      setCommandHistory([])
+      return
+    }
+    setCommandHistory(readCommandHistory(identityKey, MAX_COMMAND_HISTORY))
+  }, [identityKey])
+
+  useEffect(() => {
+    if (!connectionInstanceId) return
+    if (!identityKey) return
+
+    setLogs([])
+    const history = readConsoleHistory(identityKey, MAX_HISTORY_LOGS)
+    setLogs(history)
+  }, [connectionInstanceId, identityKey])
+
+  useEffect(() => {
+    if (!identityKey) return
+    if (historyPersistTimeoutRef.current) {
+      window.clearTimeout(historyPersistTimeoutRef.current)
+      historyPersistTimeoutRef.current = null
+    }
+
+    historyPersistTimeoutRef.current = window.setTimeout(() => {
+      writeConsoleHistory(identityKey, logs, MAX_HISTORY_LOGS)
+    }, 500)
+
+    return () => {
+      if (historyPersistTimeoutRef.current) {
+        window.clearTimeout(historyPersistTimeoutRef.current)
+        historyPersistTimeoutRef.current = null
+      }
+    }
+  }, [logs, identityKey])
+
+  useEffect(() => {
+    const lastLine = command.split('\n').at(-1) ?? ''
+    const indent = lastLine.match(/^\s*/)?.[0] ?? ''
+    const prefix = lastLine.slice(indent.length).trim()
+    if (!prefix) {
+      setIsAutocompleteOpen(false)
+      setSuggestions([])
+      setActiveSuggestionIndex(0)
+      return
+    }
+
+    const next = commandHistory
+      .filter(c => c.startsWith(prefix))
+      .slice(0, MAX_SUGGESTIONS)
+
+    if (next.length === 0) {
+      setIsAutocompleteOpen(false)
+      setSuggestions([])
+      setActiveSuggestionIndex(0)
+      return
+    }
+
+    setSuggestions(next)
+    setIsAutocompleteOpen(true)
+    setActiveSuggestionIndex(i => Math.min(i, next.length - 1))
+  }, [command, commandHistory])
 
   useEffect(() => {
     if (autoScroll && logsContainerRef.current) {
@@ -133,7 +255,7 @@ export default function ConsolePage() {
         // 切换到观察模式时，主动断开之前的连接
         disconnect()
     }
-  }, [token, connectionMode, shard, connect, disconnect])
+  }, [token, connectionMode, connect, disconnect])
 
   const handleSpectatorConnect = () => {
       if (!enableSpectatorMode) return
@@ -174,32 +296,6 @@ export default function ConsolePage() {
     } else if (selectedTokenIndex > index) {
       setSelectedTokenIndex(selectedTokenIndex - 1)
     }
-  }
-
-  const handleSavedTokenSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const index = parseInt(e.target.value)
-    setSelectedTokenIndex(index)
-    
-    if (index >= 0) {
-      const selectedToken = savedTokens[index]
-      setToken(selectedToken.token)
-      localStorage.setItem('screeps_token', selectedToken.token)
-    } else {
-      setToken('')
-      localStorage.removeItem('screeps_token')
-    }
-  }
-
-  const handleShardChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newShard = e.target.value
-    setShard(newShard)
-    localStorage.setItem('screeps_shard', newShard)
-    
-    setLogs(prev => [...prev, {
-        message: `[System] Command target switched to ${newShard}`,
-        timestamp: Date.now(),
-        shard: newShard
-    }])
   }
 
   const saveCommand = () => {
@@ -255,6 +351,11 @@ export default function ConsolePage() {
       }
       setLogs(prev => [...prev, newLog])
 
+      if (identityKey) {
+        const updated = addCommandToHistory(identityKey, command, MAX_COMMAND_HISTORY)
+        setCommandHistory(updated)
+      }
+
       const api = new ScreepsApiClient(shard, token)
       const data = await api.executeConsoleCommand(command)
       
@@ -268,11 +369,13 @@ export default function ConsolePage() {
       }
       
       setCommand('')
+      setIsAutocompleteOpen(false)
 
-    } catch (err: any) {
-      setError(err.message || '执行出错')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '执行出错'
+      setError(message)
       setLogs(prev => [...prev, {
-        message: err.message || 'Execution failed',
+        message,
         error: true,
         timestamp: Date.now(),
         shard: shard
@@ -282,7 +385,47 @@ export default function ConsolePage() {
     }
   }
 
+  const applySuggestion = (suggestion: string) => {
+    const lines = command.split('\n')
+    if (lines.length === 0) {
+      setCommand(suggestion)
+    } else {
+      const lastLine = lines[lines.length - 1] ?? ''
+      const indent = lastLine.match(/^\s*/)?.[0] ?? ''
+      lines[lines.length - 1] = indent + suggestion
+      setCommand(lines.join('\n'))
+    }
+    setIsAutocompleteOpen(false)
+    requestAnimationFrame(() => {
+      const el = commandInputRef.current
+      if (!el) return
+      const len = el.value.length
+      el.setSelectionRange(len, len)
+      el.focus()
+    })
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Tab' && isAutocompleteOpen && suggestions.length > 0) {
+      e.preventDefault()
+      applySuggestion(suggestions[activeSuggestionIndex] || suggestions[0])
+      return
+    }
+    if (e.key === 'Escape' && isAutocompleteOpen) {
+      e.preventDefault()
+      setIsAutocompleteOpen(false)
+      return
+    }
+    if (e.key === 'ArrowDown' && isAutocompleteOpen && suggestions.length > 0) {
+      e.preventDefault()
+      setActiveSuggestionIndex(i => (i + 1) % suggestions.length)
+      return
+    }
+    if (e.key === 'ArrowUp' && isAutocompleteOpen && suggestions.length > 0) {
+      e.preventDefault()
+      setActiveSuggestionIndex(i => (i - 1 + suggestions.length) % suggestions.length)
+      return
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       executeCommand()
@@ -290,6 +433,12 @@ export default function ConsolePage() {
   }
 
   const clearLogs = () => {
+    setLogs([])
+  }
+
+  const clearHistory = () => {
+    if (!identityKey) return
+    clearConsoleHistory(identityKey)
     setLogs([])
   }
 
@@ -584,6 +733,15 @@ export default function ConsolePage() {
                 >
                     清除日志
                 </button>
+                <button 
+                    onClick={clearHistory}
+                    disabled={!identityKey}
+                    className={`text-xs transition-colors ${
+                      identityKey ? 'text-[#909fc4] hover:text-white' : 'text-[#909fc4]/30 cursor-not-allowed'
+                    }`}
+                >
+                    清除历史
+                </button>
               </div>
             </div>
 
@@ -600,7 +758,7 @@ export default function ConsolePage() {
               {logs.map((log, index) => (
                 <div key={index} className={`break-all ${log.error ? 'text-[#ff7379]' : 'text-[#e5e7eb]'}`}>
                   <span className="text-[#909fc4]/50 text-xs mr-2">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-                  <span className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: log.message }} />
+                  <span className="whitespace-pre-wrap">{log.message}</span>
                 </div>
 
               ))}
@@ -695,8 +853,9 @@ export default function ConsolePage() {
                  </div>
                )}
 
-              <div className="p-4">
+              <div className="p-4 relative">
                 <textarea
+                  ref={commandInputRef}
                   value={command}
                   onChange={(e) => setCommand(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -706,6 +865,31 @@ export default function ConsolePage() {
                     connectionMode === 'spectator' ? 'cursor-not-allowed opacity-50' : ''
                   }`}
                 />
+
+                {connectionMode !== 'spectator' && isAutocompleteOpen && suggestions.length > 0 && (
+                  <div className="absolute left-4 right-4 bottom-14 rounded-lg bg-[#161724]/95 backdrop-blur-md border border-[#5973ff]/20 shadow-xl overflow-hidden">
+                    <div className="max-h-40 overflow-y-auto">
+                      {suggestions.map((s, i) => (
+                        <button
+                          key={`${s}-${i}`}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            applySuggestion(s)
+                          }}
+                          className={`w-full text-left px-3 py-2 font-mono text-xs transition-colors ${
+                            i === activeSuggestionIndex
+                              ? 'bg-[#5973ff]/20 text-white'
+                              : 'text-[#909fc4] hover:text-white hover:bg-[#5973ff]/10'
+                          }`}
+                          title={s}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 <div className="flex items-center justify-between h-8">
                     <div className="text-[#ff7379] text-xs truncate mr-4">
