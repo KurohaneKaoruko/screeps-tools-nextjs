@@ -1,6 +1,11 @@
-import Link from 'next/link'
+'use client'
+
+import { usePathname } from 'next/navigation'
 
 export default function Footer() {
+  const pathname = usePathname()
+  if (pathname.startsWith('/tools/console')) return null
+
   return (
     <footer className="relative mt-auto border-t border-[#5973ff]/15 bg-[#161724]/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

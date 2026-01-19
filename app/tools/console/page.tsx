@@ -720,12 +720,12 @@ export default function ConsolePage() {
   }
 
   return (
-    <div className="min-h-screen screeps-bg">
+    <div className="h-screen box-border pt-12 screeps-bg overflow-hidden">
       <div className="grid-bg" />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-12">
+      <div className="h-full w-full px-2 sm:px-4 py-3 flex flex-col gap-3 box-border">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
               <button
@@ -984,8 +984,8 @@ export default function ConsolePage() {
         </div>
 
 
-        <div className="relative">
-          <div className="flex-1 flex flex-col h-[calc(100vh-200px)] min-h-[600px] bg-[#1d2027]/60 backdrop-blur-sm rounded-md border border-[#5973ff]/10 overflow-hidden">
+        <div className="relative flex-1 min-h-0">
+          <div className="flex flex-col h-full min-h-0 bg-[#1d2027]/60 backdrop-blur-sm rounded-md border border-[#5973ff]/10 overflow-hidden">
             {/* Toolbar */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-[#5973ff]/10 bg-[#161724]/50">
               <div className="flex items-center gap-2">
@@ -1015,7 +1015,7 @@ export default function ConsolePage() {
             {/* Output */}
             <div 
                 ref={logsContainerRef}
-                className="flex-1 overflow-y-auto p-4 font-mono text-xs leading-tight space-y-1 scroll-smooth"
+                className="flex-1 min-h-0 overflow-y-auto p-4 font-mono text-xs leading-tight space-y-1 scroll-smooth"
             >
               {logs.length === 0 && (
                 <div className="text-[#909fc4]/40 text-center mt-20">

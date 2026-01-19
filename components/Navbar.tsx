@@ -2,21 +2,27 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const pathname = usePathname()
+  const isConsole = pathname.startsWith('/tools/console')
+  const headerHeightClass = isConsole ? 'h-12' : 'h-16'
+  const logoTextClass = isConsole ? 'text-lg' : 'text-xl'
+  const containerClass = isConsole ? 'w-full px-2 sm:px-4' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#161724]/90 backdrop-blur-md border-b border-[#5973ff]/15">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+      <div className={containerClass}>
+        <div className={`flex justify-between ${headerHeightClass}`}>
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-1 group">
-              <span className="text-[#909fc4] text-xl">&lt;</span>
-              <span className="text-xl font-bold gradient-text-blue">Screeps</span>
-              <span className="text-[#909fc4] text-xl">&gt;</span>
-              <span className="text-xl font-light text-[#909fc4] ml-1">Tools</span>
+              <span className={`text-[#909fc4] ${logoTextClass}`}>&lt;</span>
+              <span className={`${logoTextClass} font-bold gradient-text-blue`}>Screeps</span>
+              <span className={`text-[#909fc4] ${logoTextClass}`}>&gt;</span>
+              <span className={`${logoTextClass} font-light text-[#909fc4] ml-1`}>Tools</span>
             </Link>
           </div>
           
