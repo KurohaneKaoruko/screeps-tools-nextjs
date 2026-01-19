@@ -117,8 +117,9 @@ export default function NukeStatusPage() {
   }
 
   function formatTickSpeed(ms: number): string {
-    const seconds = (ms / 1000).toFixed(1)
-    return `${seconds}秒`
+    if (!Number.isFinite(ms) || ms <= 0) return '-'
+    if (ms % 1000 === 0) return `${ms / 1000}秒`
+    return `${Math.round(ms)}ms`
   }
 
   const shards = ['shard0', 'shard1', 'shard2', 'shard3']
