@@ -349,6 +349,19 @@ export default function ConsolePage() {
   const looksLikeHtmlMessage = (raw: string) =>
     /<\/?[a-zA-Z][\s>]/.test(raw) || raw.includes('<style') || raw.includes('<br')
 
+  const isUnsafeHtmlMessage = (raw: string) => {
+    const lower = raw.toLowerCase()
+    if (lower.includes('<script')) return true
+    if (lower.includes('<iframe')) return true
+    if (lower.includes('<object') || lower.includes('<embed')) return true
+    if (lower.includes('<link') || lower.includes('<meta') || lower.includes('<base')) return true
+    if (lower.includes('<form')) return true
+    if (lower.includes('srcdoc=')) return true
+    if (/\son[a-z]+\s*=/.test(lower)) return true
+    if (lower.includes('javascript:')) return true
+    return false
+  }
+
   const buildSandboxSrcDoc = (html: string, id: string) => {
     const safeId = id.replace(/["\\]/g, '\\$&')
     return `<!doctype html>
@@ -364,9 +377,9 @@ export default function ConsolePage() {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         font-size: 12px;
         line-height: 1.25;
-        white-space: pre-wrap;
         overflow: hidden;
       }
+      #root { white-space: pre-wrap; overflow-wrap: anywhere; }
       a { color: #5973ff; }
     </style>
   </head>
@@ -377,7 +390,8 @@ export default function ConsolePage() {
         var id = "${safeId}";
         function postHeight() {
           try {
-            var h = Math.max(
+            var root = document.getElementById("root");
+            var h = root ? root.scrollHeight : Math.max(
               document.documentElement.scrollHeight || 0,
               document.body.scrollHeight || 0
             );
@@ -387,7 +401,8 @@ export default function ConsolePage() {
         var ro = null;
         if (typeof ResizeObserver !== "undefined") {
           ro = new ResizeObserver(function () { postHeight(); });
-          ro.observe(document.documentElement);
+          var root = document.getElementById("root") || document.documentElement;
+          ro.observe(root);
         } else {
           var mo = new MutationObserver(function () { postHeight(); });
           mo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, characterData: true });
@@ -1120,7 +1135,9 @@ export default function ConsolePage() {
               {logs.map((log, index) => (
                 <div key={index} className={`break-all ${log.error ? 'text-[#ff7379]' : 'text-[#e5e7eb]'}`}>
                   <span className="text-[#909fc4]/50 text-xs mr-2">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-                  {looksLikeHtmlMessage(log.message) ? (
+                  {!looksLikeHtmlMessage(log.message) ? (
+                    <span className="whitespace-pre-wrap">{log.message}</span>
+                  ) : isUnsafeHtmlMessage(log.message) ? (
                     <iframe
                       title="console-html"
                       sandbox="allow-scripts"
@@ -1131,7 +1148,11 @@ export default function ConsolePage() {
                       srcDoc={buildSandboxSrcDoc(log.message, `${log.timestamp}-${index}`)}
                     />
                   ) : (
-                    <span className="whitespace-pre-wrap">{log.message}</span>
+                    <span
+                      className="whitespace-pre-wrap"
+                      data-console-scope={`${log.timestamp}-${index}`}
+                      dangerouslySetInnerHTML={{ __html: sanitizeConsoleHtml(log.message, `${log.timestamp}-${index}`) }}
+                    />
                   )}
                 </div>
 
