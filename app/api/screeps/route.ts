@@ -297,7 +297,7 @@ async function getNukes(shards: string[]): Promise<NukesResponse> {
           
           // 使用 screeps-simple-api 获取游戏时间
           const gameTimeData = await api.getGameTime(shard as Shard)
-          shardGameTimes[shard] = gameTimeData.time || Math.floor(Date.now() / 1000)
+          shardGameTimes[shard] = typeof gameTimeData?.time === 'number' ? gameTimeData.time : 0
           
           return shardNukes.map((nuke: any) => ({
             id: nuke._id || nuke.id || '',
@@ -344,9 +344,9 @@ async function getNukes(shards: string[]): Promise<NukesResponse> {
       })
     }
     
-    return { ok: 1, nukes: allNukes, shardGameTimes, shardTickRates: shardTickSpeeds }
+    return { ok: 1, nukes: allNukes, shardGameTimes, shardTickSpeeds }
   } catch (error) {
-    return { ok: 1, nukes: allNukes, shardGameTimes, shardTickRates: {} }
+    return { ok: 1, nukes: allNukes, shardGameTimes, shardTickSpeeds: {} }
   }
 }
 

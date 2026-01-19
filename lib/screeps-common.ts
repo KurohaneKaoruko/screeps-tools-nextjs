@@ -79,7 +79,7 @@ export interface NukesResponse {
   ok: number
   nukes: NukeData[]
   shardGameTimes: Record<string, number>
-  shardTickRates: Record<string, number>
+  shardTickSpeeds: Record<string, number>
   error?: string
 }
 

@@ -1,27 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-
-interface NukeData {
-  id: string
-  roomName: string
-  launchRoomName: string
-  landTime: number
-  shard: string
-  targetOwner?: string
-  launchOwner?: string
-}
+import type { NukeData, NukesResponse } from '@/lib/screeps-common'
 
 interface NukeDataWithTime extends NukeData {
   timeToLand: number
-}
-
-interface NukesResponse {
-  ok: number
-  nukes: NukeData[]
-  shardGameTimes: Record<string, number>
-  shardTickSpeeds?: Record<string, number>
-  error?: string
 }
 
 function formatTimeToLand(timeToLand: number): string {
@@ -104,10 +87,20 @@ export default function NukeStatusPage() {
 
   const totalNukes = data ? data.nukes.length : 0
   
-  const nukesWithTimeToLand: NukeDataWithTime[] = data ? data.nukes.map(n => ({
-    ...n,
-    timeToLand: Math.max(0, n.landTime - (data.shardGameTimes[n.shard] || 0))
-  })) : []
+  const nukesWithTimeToLand: NukeDataWithTime[] = data
+    ? data.nukes.map(n => {
+        const tickMs = typeof data.shardTickSpeeds?.[n.shard] === 'number' ? data.shardTickSpeeds[n.shard] : 1000
+        const ticksRemaining =
+          n.timeToLand > 0
+            ? n.timeToLand
+            : Math.max(0, n.landTime - (data.shardGameTimes?.[n.shard] ?? 0))
+
+        return {
+          ...n,
+          timeToLand: Math.max(0, (ticksRemaining * tickMs) / 1000)
+        }
+      })
+    : []
   
   const urgentNukes = nukesWithTimeToLand.filter(n => {
     return n.timeToLand <= 300 // 5分钟内爆炸
@@ -214,6 +207,7 @@ export default function NukeStatusPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {shards.map(shard => {
                     const shardNukes = nukesByShard[shard] || []
+                    const tickMsForShard = data.shardTickSpeeds?.[shard]
                     
                     return (
                         <div key={shard} className="bg-[#1d2027]/40 backdrop-blur-sm rounded-md border border-[#5973ff]/20 overflow-hidden">
@@ -224,9 +218,9 @@ export default function NukeStatusPage() {
                               <h2 className="text-sm font-bold text-white">{shard}</h2>
                             </div>
                             <div className="flex items-center gap-2">
-                              {data.shardTickSpeeds?.[shard] && (
+                              {typeof tickMsForShard === 'number' && tickMsForShard > 0 && (
                                 <span className="text-xs text-[#6c82ff] font-mono">
-                                  ⚡ {formatTickSpeed(data.shardTickSpeeds[shard])}
+                                  ⚡ {formatTickSpeed(tickMsForShard)}
                                 </span>
                               )}
                               <span className="px-1.5 py-0.5 bg-[#5973ff]/30 rounded-full text-xs font-medium text-[#6c82ff]">
