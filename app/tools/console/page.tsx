@@ -330,6 +330,8 @@ function sanitizeConsoleHtml(raw: string, scopeId: string): string {
 export default function ConsolePage() {
   const MAX_COMMAND_HISTORY = 200
   const MAX_SUGGESTIONS = 8
+  const COMMAND_INPUT_MIN_HEIGHT = 44
+  const COMMAND_INPUT_MAX_HEIGHT = 180
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isSavedCommandsOpen, setIsSavedCommandsOpen] = useState(false)
@@ -503,6 +505,15 @@ export default function ConsolePage() {
     setIsAutocompleteOpen(true)
     setActiveSuggestionIndex(i => Math.min(i, next.length - 1))
   }, [command, commandHistory])
+
+  useEffect(() => {
+    const el = commandInputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    const nextHeight = Math.min(Math.max(el.scrollHeight, COMMAND_INPUT_MIN_HEIGHT), COMMAND_INPUT_MAX_HEIGHT)
+    el.style.height = `${nextHeight}px`
+    el.style.overflowY = el.scrollHeight > COMMAND_INPUT_MAX_HEIGHT ? 'auto' : 'hidden'
+  }, [command, connectionMode])
 
   useEffect(() => {
     if (autoScroll && logsContainerRef.current) {
@@ -1125,63 +1136,62 @@ export default function ConsolePage() {
                )}
 
               <div className="p-4 relative">
-                <textarea
-                  ref={commandInputRef}
-                  value={command}
-                  onChange={(e) => setCommand(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  disabled={connectionMode === 'spectator'}
-                  placeholder={connectionMode === 'spectator' ? "观察模式下无法输入命令" : "输入代码..."}
-                  className={`w-full h-20 bg-[#0b0d0f]/50 border border-[#5973ff]/20 rounded-lg p-3 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50 resize-none mb-2 ${
-                    connectionMode === 'spectator' ? 'cursor-not-allowed opacity-50' : ''
-                  }`}
-                />
+                <div className="flex gap-2 items-center">
+                  <div className="relative flex-1">
+                    {connectionMode !== 'spectator' && isAutocompleteOpen && suggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 bottom-full mb-2 rounded-lg bg-[#161724]/95 backdrop-blur-md border border-[#5973ff]/20 shadow-xl overflow-hidden z-20">
+                        <div className="max-h-40 overflow-y-auto">
+                          {suggestions.map((s, i) => (
+                            <button
+                              key={`${s}-${i}`}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                applySuggestion(s)
+                              }}
+                              className={`w-full text-left px-3 py-2 font-mono text-xs transition-colors ${
+                                i === activeSuggestionIndex
+                                  ? 'bg-[#5973ff]/20 text-white'
+                                  : 'text-[#909fc4] hover:text-white hover:bg-[#5973ff]/10'
+                              }`}
+                              title={s}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                {connectionMode !== 'spectator' && isAutocompleteOpen && suggestions.length > 0 && (
-                  <div className="absolute left-4 right-4 bottom-14 rounded-lg bg-[#161724]/95 backdrop-blur-md border border-[#5973ff]/20 shadow-xl overflow-hidden">
-                    <div className="max-h-40 overflow-y-auto">
-                      {suggestions.map((s, i) => (
-                        <button
-                          key={`${s}-${i}`}
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            applySuggestion(s)
-                          }}
-                          className={`w-full text-left px-3 py-2 font-mono text-xs transition-colors ${
-                            i === activeSuggestionIndex
-                              ? 'bg-[#5973ff]/20 text-white'
-                              : 'text-[#909fc4] hover:text-white hover:bg-[#5973ff]/10'
-                          }`}
-                          title={s}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
+                    <textarea
+                      ref={commandInputRef}
+                      value={command}
+                      onChange={(e) => setCommand(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      disabled={connectionMode === 'spectator'}
+                      placeholder={connectionMode === 'spectator' ? "观察模式下无法输入命令" : "输入代码..."}
+                      style={{ minHeight: COMMAND_INPUT_MIN_HEIGHT, maxHeight: COMMAND_INPUT_MAX_HEIGHT }}
+                      className={`w-full bg-[#0b0d0f]/50 border border-[#5973ff]/20 rounded-lg p-3 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50 resize-none ${
+                        connectionMode === 'spectator' ? 'cursor-not-allowed opacity-50' : ''
+                      }`}
+                    />
                   </div>
-                )}
-                
-                <div className="flex items-center justify-between h-8">
-                    <div className="text-[#ff7379] text-xs truncate mr-4">
-                        {error}
-                    </div>
-                    <div className="flex gap-3 items-center shrink-0">
-                      <span className="text-[10px] text-[#909fc4]/40 hidden sm:block whitespace-nowrap">
-                        Shift + Enter 换行
-                      </span>
-                      <button
-                        onClick={executeCommand}
-                        disabled={isLoading || !token || connectionMode === 'spectator'}
-                        className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                          isLoading || !token || connectionMode === 'spectator'
-                            ? 'bg-[#909fc4]/10 text-[#909fc4]/50 cursor-not-allowed'
-                            : 'btn-primary text-white hover:shadow-lg hover:shadow-[#5973ff]/20'
-                        }`}
-                      >
-                        {isLoading ? '执行中...' : '执行'}
-                      </button>
-                    </div>
+
+                  <button
+                    onClick={executeCommand}
+                    disabled={isLoading || !token || connectionMode === 'spectator'}
+                    className={`h-11 px-4 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                      isLoading || !token || connectionMode === 'spectator'
+                        ? 'bg-[#909fc4]/10 text-[#909fc4]/50 cursor-not-allowed'
+                        : 'btn-primary text-white hover:shadow-lg hover:shadow-[#5973ff]/20'
+                    }`}
+                  >
+                    {isLoading ? '执行中...' : '执行'}
+                  </button>
+                </div>
+
+                <div className="mt-2 text-[#ff7379] text-xs truncate">
+                  {error}
                 </div>
               </div>
             </div>
