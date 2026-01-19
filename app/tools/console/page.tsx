@@ -43,8 +43,6 @@ function sanitizeConsoleHtml(raw: string, scopeId: string): string {
   if (!looksLikeHtml) return escapeHtml(raw)
 
   const blockedTags = new Set([
-    'SCRIPT',
-    'IFRAME',
     'OBJECT',
     'EMBED',
     'LINK',
@@ -243,6 +241,21 @@ function sanitizeConsoleHtml(raw: string, scopeId: string): string {
 
   const sanitizeElement = (el: Element) => {
     const tag = el.tagName.toUpperCase()
+    if (tag === 'SCRIPT') {
+      const scriptEl = el as HTMLScriptElement
+      const pre = document.createElement('pre')
+      pre.setAttribute('style', 'white-space:pre-wrap;overflow:auto;max-height:240px;')
+      const header = scriptEl.src ? `/* src: ${scriptEl.src} */\n` : ''
+      pre.textContent = header + (scriptEl.textContent || '')
+      el.replaceWith(pre)
+      return
+    }
+    if (tag === 'IFRAME') {
+      ;(el as HTMLIFrameElement).setAttribute('sandbox', '')
+      ;(el as HTMLIFrameElement).setAttribute('referrerpolicy', 'no-referrer')
+      ;(el as HTMLIFrameElement).setAttribute('loading', 'lazy')
+      el.removeAttribute('srcdoc')
+    }
     if (blockedTags.has(tag)) {
       el.parentNode?.removeChild(el)
       return
@@ -332,6 +345,64 @@ export default function ConsolePage() {
   const MAX_SUGGESTIONS = 8
   const COMMAND_INPUT_MIN_HEIGHT = 44
   const COMMAND_INPUT_MAX_HEIGHT = 180
+  const MAX_HTML_IFRAME_HEIGHT = 320
+
+  const looksLikeHtmlMessage = (raw: string) =>
+    /<\/?[a-zA-Z][\s>]/.test(raw) || raw.includes('<style') || raw.includes('<br')
+
+  const buildSandboxSrcDoc = (html: string, id: string) => {
+    const safeId = id.replace(/["\\]/g, '\\$&')
+    return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base target="_blank" />
+    <style>
+      html, body { margin: 0; padding: 0; background: transparent; }
+      body {
+        color: #e5e7eb;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.25;
+        white-space: pre-wrap;
+        overflow: auto;
+      }
+      a { color: #5973ff; }
+    </style>
+  </head>
+  <body>
+    <div id="root">${html}</div>
+    <script>
+      (function () {
+        var id = "${safeId}";
+        function postHeight() {
+          try {
+            var h = Math.max(
+              document.documentElement.scrollHeight || 0,
+              document.body.scrollHeight || 0
+            );
+            window.parent.postMessage({ type: "console-html-height", id: id, height: h }, "*");
+          } catch (e) {}
+        }
+        var ro = null;
+        if (typeof ResizeObserver !== "undefined") {
+          ro = new ResizeObserver(function () { postHeight(); });
+          ro.observe(document.documentElement);
+        } else {
+          var mo = new MutationObserver(function () { postHeight(); });
+          mo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, characterData: true });
+        }
+        window.addEventListener("load", postHeight);
+        postHeight();
+        setInterval(postHeight, 500);
+      })();
+    </script>
+  </body>
+</html>`
+  }
+
+  const [htmlIframeHeights, setHtmlIframeHeights] = useState<Record<string, number>>({})
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isSavedCommandsOpen, setIsSavedCommandsOpen] = useState(false)
@@ -527,6 +598,20 @@ export default function ConsolePage() {
       }
     }
   }, [logs, autoScroll])
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as any
+      if (!data || data.type !== 'console-html-height') return
+      const id = typeof data.id === 'string' ? data.id : ''
+      const height = typeof data.height === 'number' ? data.height : NaN
+      if (!id || !Number.isFinite(height)) return
+      const next = Math.max(24, Math.min(height, MAX_HTML_IFRAME_HEIGHT))
+      setHtmlIframeHeights(prev => (prev[id] === next ? prev : { ...prev, [id]: next }))
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
 
   // Cleanup injected styles on unmount
   useEffect(() => {
@@ -1036,11 +1121,19 @@ export default function ConsolePage() {
               {logs.map((log, index) => (
                 <div key={index} className={`break-all ${log.error ? 'text-[#ff7379]' : 'text-[#e5e7eb]'}`}>
                   <span className="text-[#909fc4]/50 text-xs mr-2">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
-                  <span
-                    className="whitespace-pre-wrap"
-                    data-console-scope={`${log.timestamp}-${index}`}
-                    dangerouslySetInnerHTML={{ __html: sanitizeConsoleHtml(log.message, `${log.timestamp}-${index}`) }}
-                  />
+                  {looksLikeHtmlMessage(log.message) ? (
+                    <iframe
+                      title="console-html"
+                      sandbox="allow-scripts"
+                      referrerPolicy="no-referrer"
+                      loading="lazy"
+                      className="w-full border-0 bg-transparent align-middle"
+                      style={{ height: htmlIframeHeights[`${log.timestamp}-${index}`] ?? 24 }}
+                      srcDoc={buildSandboxSrcDoc(log.message, `${log.timestamp}-${index}`)}
+                    />
+                  ) : (
+                    <span className="whitespace-pre-wrap">{log.message}</span>
+                  )}
                 </div>
 
               ))}
