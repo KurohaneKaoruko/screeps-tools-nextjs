@@ -36,152 +36,275 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;')
 }
 
-function sanitizeConsoleHtml(raw: string): string {
+function sanitizeConsoleHtml(raw: string, scopeId: string): string {
   if (!raw) return ''
   if (typeof document === 'undefined') return escapeHtml(raw)
   const looksLikeHtml = /<\/?[a-zA-Z][\s>]/.test(raw) || raw.includes('<style') || raw.includes('<br')
   if (!looksLikeHtml) return escapeHtml(raw)
 
-  const allowedTags = new Set([
-    'DIV',
-    'SPAN',
-    'BR',
-    'B',
-    'I',
-    'U',
-    'S',
-    'CODE',
-    'PRE',
-    'P',
-    'UL',
-    'OL',
-    'LI',
-    'LABEL',
-    'INPUT'
+  const blockedTags = new Set([
+    'SCRIPT',
+    'IFRAME',
+    'OBJECT',
+    'EMBED',
+    'LINK',
+    'META',
+    'BASE',
+    'FORM'
   ])
-  const allowedStyleProps = new Set([
-    'color',
-    'background-color',
-    'font-weight',
-    'font-style',
-    'text-decoration',
-    'display',
-    'flex-flow',
-    'padding',
-    'margin',
-    'width',
-    'min-width',
-    'max-width',
-    'height',
-    'max-height',
-    'overflow',
-    'transition',
-    'cursor',
-    'white-space',
-    'text-overflow',
-    'align-items',
-    'flex',
-    'flex-direction',
-    'flex-wrap',
-    'justify-content'
-  ])
+
+  const urlAttrs = new Set(['href', 'src', 'xlink:href', 'action', 'formaction', 'poster'])
+
+  const escapeAttrValue = (value: string) => value.replace(/[\u0000-\u001f\u007f]/g, '')
+
+  const isSafeUrl = (value: string): boolean => {
+    const v = value.trim()
+    if (!v) return false
+    if (v.startsWith('#')) return true
+    if (v.startsWith('/')) return true
+    const lower = v.toLowerCase()
+    if (lower.startsWith('http://') || lower.startsWith('https://')) return true
+    if (lower.startsWith('mailto:') || lower.startsWith('tel:')) return true
+    if (lower.startsWith('data:')) {
+      return /^data:image\/(png|jpeg|jpg|gif|webp);base64,[a-z0-9+/=]+$/i.test(v)
+    }
+    return false
+  }
+
+  const sanitizeInlineStyle = (value: string): string => {
+    const v = value
+    const lowered = v.toLowerCase()
+    if (
+      lowered.includes('expression') ||
+      lowered.includes('javascript:') ||
+      lowered.includes('-moz-binding') ||
+      lowered.includes('behavior:')
+    ) {
+      return ''
+    }
+    return v.replace(/[\u0000-\u001f\u007f]/g, '')
+  }
+
+  const cssScopePrefix = `[data-console-scope="${scopeId.replace(/["\\]/g, '\\$&')}"]`
+
+  const scopeSelectors = (selectors: string): string => {
+    return selectors
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(s => (s.includes(cssScopePrefix) ? s : `${cssScopePrefix} ${s}`))
+      .join(', ')
+  }
+
+  const scopeCss = (css: string): string => {
+    const process = (input: string): string => {
+      let i = 0
+      const n = input.length
+      let out = ''
+
+      const consumeTrivia = () => {
+        while (i < n) {
+          const ch = input[i]!
+          if (/\s/.test(ch)) {
+            out += ch
+            i++
+            continue
+          }
+          if (ch === '/' && input[i + 1] === '*') {
+            const start = i
+            i += 2
+            while (i < n && !(input[i] === '*' && input[i + 1] === '/')) i++
+            i = Math.min(n, i + 2)
+            out += input.slice(start, i)
+            continue
+          }
+          break
+        }
+      }
+
+      const readUntilStop = (stops: Set<string>): string => {
+        let start = i
+        while (i < n) {
+          const ch = input[i]!
+          if (stops.has(ch)) break
+          if (ch === '"' || ch === "'") {
+            const quote = ch
+            i++
+            while (i < n) {
+              const qch = input[i]!
+              if (qch === '\\') {
+                i += 2
+                continue
+              }
+              i++
+              if (qch === quote) break
+            }
+            continue
+          }
+          if (ch === '/' && input[i + 1] === '*') {
+            i += 2
+            while (i < n && !(input[i] === '*' && input[i + 1] === '/')) i++
+            i = Math.min(n, i + 2)
+            continue
+          }
+          i++
+        }
+        return input.slice(start, i)
+      }
+
+      const readBlockRaw = (): string => {
+        const start = i
+        let depth = 0
+        while (i < n) {
+          const ch = input[i]!
+          if (ch === '{') {
+            depth++
+            i++
+            continue
+          }
+          if (ch === '}') {
+            depth--
+            i++
+            if (depth === 0) return input.slice(start, i)
+            continue
+          }
+          if (ch === '"' || ch === "'") {
+            const quote = ch
+            i++
+            while (i < n) {
+              const qch = input[i]!
+              if (qch === '\\') {
+                i += 2
+                continue
+              }
+              i++
+              if (qch === quote) break
+            }
+            continue
+          }
+          if (ch === '/' && input[i + 1] === '*') {
+            i += 2
+            while (i < n && !(input[i] === '*' && input[i + 1] === '/')) i++
+            i = Math.min(n, i + 2)
+            continue
+          }
+          i++
+        }
+        return input.slice(start)
+      }
+
+      while (i < n) {
+        consumeTrivia()
+        if (i >= n) break
+
+        if (input[i] === '@') {
+          const atStart = i
+          i++
+          const name = readUntilStop(new Set([' ', '\t', '\r', '\n', '{', ';'])).trim().toLowerCase()
+          const prelude = readUntilStop(new Set(['{', ';']))
+          if (i < n && input[i] === ';') {
+            i++
+            out += input.slice(atStart, i)
+            continue
+          }
+          if (i < n && input[i] === '{') {
+            const header = input.slice(atStart, i + 1)
+            const block = readBlockRaw()
+            const inner = block.slice(1, -1)
+            if (name.endsWith('keyframes')) {
+              out += header + inner + '}'
+            } else {
+              out += header + process(inner) + '}'
+            }
+            continue
+          }
+          out += '@' + name + prelude
+          continue
+        }
+
+        const selectorText = readUntilStop(new Set(['{']))
+        if (i >= n || input[i] !== '{') {
+          out += selectorText
+          break
+        }
+        const scoped = scopeSelectors(selectorText)
+        out += scoped
+        const block = readBlockRaw()
+        out += block
+      }
+      return out
+    }
+
+    return process(css)
+  }
 
   const template = document.createElement('template')
   template.innerHTML = raw
 
-  // Extract and inject style tags into document head
-  const styleTags = template.content.querySelectorAll('style')
-  styleTags.forEach(styleEl => {
-    const css = styleEl.textContent || ''
-    const lowered = css.toLowerCase()
-    
-    // Security check
-    if (
-      lowered.includes('@import') ||
-      lowered.includes('expression') ||
-      lowered.includes('javascript:') ||
-      lowered.includes('url(')
-    ) {
-      styleEl.remove()
-      return
-    }
-
-    // Create a unique ID for this style block to avoid duplicates
-    const styleId = `screeps-console-style-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    
-    // Check if we already have this exact style
-    const existingStyle = Array.from(document.head.querySelectorAll('style[data-screeps-console]'))
-      .find(s => s.textContent === css)
-    
-    if (!existingStyle) {
-      const newStyle = document.createElement('style')
-      newStyle.setAttribute('data-screeps-console', styleId)
-      newStyle.textContent = css
-      document.head.appendChild(newStyle)
-    }
-    
-    // Remove the style tag from the content
-    styleEl.remove()
-  })
-
   const sanitizeElement = (el: Element) => {
     const tag = el.tagName.toUpperCase()
-    if (tag === 'SCRIPT') {
-      el.remove()
-      return
-    }
-    if (!allowedTags.has(tag)) {
-      const text = el.textContent || ''
-      el.replaceWith(document.createTextNode(text))
+    if (blockedTags.has(tag)) {
+      el.parentNode?.removeChild(el)
       return
     }
 
-    const originalClass = (el as HTMLElement).getAttribute('class')
-    const originalStyle = (el as HTMLElement).getAttribute('style')
-    const originalType = tag === 'INPUT' ? (el as HTMLInputElement).getAttribute('type') : ''
-    const originalId = (el as HTMLElement).getAttribute('id')
-    const originalFor = tag === 'LABEL' ? (el as HTMLElement).getAttribute('for') : ''
+    if (tag === 'STYLE') {
+      const css = el.textContent || ''
+      const lowered = css.toLowerCase()
+      if (
+        lowered.includes('@import') ||
+        lowered.includes('expression') ||
+        lowered.includes('javascript:')
+      ) {
+        el.parentNode?.removeChild(el)
+        return
+      }
+      el.textContent = scopeCss(css)
+      return
+    }
 
     for (const attr of Array.from(el.attributes)) {
-      el.removeAttribute(attr.name)
-    }
+      const name = attr.name
+      const value = attr.value
+      const lowerName = name.toLowerCase()
 
-    // Preserve input type and id for checkbox functionality
-    if (tag === 'INPUT' && originalType) {
-      ;(el as HTMLInputElement).setAttribute('type', originalType)
-    }
-    if (originalId && /^[a-zA-Z0-9_-]+$/.test(originalId)) {
-      ;(el as HTMLElement).setAttribute('id', originalId)
-    }
-    if (tag === 'LABEL' && originalFor && /^[a-zA-Z0-9_-]+$/.test(originalFor)) {
-      ;(el as HTMLElement).setAttribute('for', originalFor)
-    }
-
-    if (originalClass) {
-      const tokens = originalClass
-        .split(/\s+/)
-        .map(t => t.trim())
-        .filter(Boolean)
-        .filter(t => /^[a-zA-Z0-9_-]+$/.test(t))
-      if (tokens.length > 0) (el as HTMLElement).setAttribute('class', tokens.join(' '))
-    }
-
-    if (originalStyle) {
-      const sanitized: string[] = []
-      for (const part of originalStyle.split(';')) {
-        const [rawProp, ...rawValParts] = part.split(':')
-        const prop = (rawProp || '').trim().toLowerCase()
-        const value = rawValParts.join(':').trim()
-        if (!prop || !value) continue
-        if (!allowedStyleProps.has(prop)) continue
-        const lowered = value.toLowerCase()
-        if (lowered.includes('url(') || lowered.includes('expression') || lowered.includes('javascript:')) continue
-        // Allow more characters for layout properties
-        if (!/^[#(),.%\s\w-]+$/.test(value)) continue
-        sanitized.push(`${prop}:${value}`)
+      if (lowerName.startsWith('on')) {
+        el.removeAttribute(name)
+        continue
       }
-      if (sanitized.length > 0) {
-        ;(el as HTMLElement).setAttribute('style', sanitized.join(';'))
+
+      if (urlAttrs.has(lowerName)) {
+        if (isSafeUrl(value)) {
+          el.setAttribute(name, escapeAttrValue(value))
+        } else {
+          el.removeAttribute(name)
+        }
+        continue
+      }
+
+      if (lowerName === 'style') {
+        const sanitized = sanitizeInlineStyle(value)
+        if (sanitized) el.setAttribute('style', sanitized)
+        else el.removeAttribute(name)
+        continue
+      }
+
+      if (lowerName === 'srcset') {
+        el.removeAttribute(name)
+        continue
+      }
+
+      el.setAttribute(name, escapeAttrValue(value))
+    }
+
+    if (tag === 'A') {
+      const target = (el as HTMLAnchorElement).getAttribute('target')
+      if (target && target.toLowerCase() === '_blank') {
+        const rel = (el as HTMLAnchorElement).getAttribute('rel') || ''
+        const tokens = new Set(rel.split(/\s+/).filter(Boolean).map(t => t.toLowerCase()))
+        tokens.add('noopener')
+        tokens.add('noreferrer')
+        ;(el as HTMLAnchorElement).setAttribute('rel', Array.from(tokens).join(' '))
       }
     }
   }
@@ -904,7 +1027,8 @@ export default function ConsolePage() {
                   <span className="text-[#909fc4]/50 text-xs mr-2">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
                   <span
                     className="whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{ __html: sanitizeConsoleHtml(log.message) }}
+                    data-console-scope={`${log.timestamp}-${index}`}
+                    dangerouslySetInnerHTML={{ __html: sanitizeConsoleHtml(log.message, `${log.timestamp}-${index}`) }}
                   />
                 </div>
 
