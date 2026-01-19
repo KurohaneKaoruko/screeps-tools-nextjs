@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import type { NukeData, NukesResponse } from '@/lib/screeps-common'
 
 interface NukeDataWithTime extends NukeData {
-  timeToLand: number
+  ticksToLand: number
+  secondsToLand: number
 }
 
 function formatTimeToLand(timeToLand: number): string {
@@ -94,16 +95,19 @@ export default function NukeStatusPage() {
           n.timeToLand > 0
             ? n.timeToLand
             : Math.max(0, n.landTime - (data.shardGameTimes?.[n.shard] ?? 0))
+        const ticksToLand = Math.max(0, Math.ceil(ticksRemaining))
+        const secondsToLand = Math.max(0, Math.ceil((ticksToLand * tickMs) / 1000))
 
         return {
           ...n,
-          timeToLand: Math.max(0, (ticksRemaining * tickMs) / 1000)
+          ticksToLand,
+          secondsToLand
         }
       })
     : []
   
   const urgentNukes = nukesWithTimeToLand.filter(n => {
-    return n.timeToLand <= 300 // 5分钟内爆炸
+    return n.secondsToLand <= 300 // 5分钟内爆炸
   }).length
 
   const nukesByShard: Record<string, NukeDataWithTime[]> = {}
@@ -235,12 +239,12 @@ export default function NukeStatusPage() {
                             {shardNukes.map((nuke, index) => (
                                 <div 
                                 key={index} 
-                                className={`bg-[#0b0d0f]/60 backdrop-blur-sm rounded-lg p-2 border transition-all hover:bg-[#0b0d0f]/80 ${getUrgencyBorderColor(nuke.timeToLand)}`}
+                                className={`bg-[#0b0d0f]/60 backdrop-blur-sm rounded-lg p-2 border transition-all hover:bg-[#0b0d0f]/80 ${getUrgencyBorderColor(nuke.secondsToLand)}`}
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5">
-                                      <div className={`w-2 h-2 rounded-full shrink-0 ${getUrgencyBgColor(nuke.timeToLand)}`} />
+                                      <div className={`w-2 h-2 rounded-full shrink-0 ${getUrgencyBgColor(nuke.secondsToLand)}`} />
                                       <div className="min-w-0">
                                         <div className="flex items-center gap-1">
                                           <a 
@@ -277,12 +281,12 @@ export default function NukeStatusPage() {
                                     </div>
                                   </div>
                                   <div className="shrink-0 text-right">
-                                    <div className={`text-sm font-bold ${getUrgencyColor(nuke.timeToLand)}`}>
-                                      {formatTimeToLand(nuke.timeToLand)}
+                                    <div className={`text-sm font-bold ${getUrgencyColor(nuke.secondsToLand)}`}>
+                                      {formatTimeToLand(nuke.secondsToLand)}
                                     </div>
                                     <div className="px-1.5 py-0.5 bg-[#5973ff]/20 rounded inline-flex items-center gap-0.5">
                                       <div className="text-sm font-mono font-bold text-[#5973ff]">
-                                        {nuke.timeToLand}
+                                        {nuke.ticksToLand}
                                       </div>
                                       <div className="text-xs text-[#6c82ff]">tick</div>
                                     </div>
