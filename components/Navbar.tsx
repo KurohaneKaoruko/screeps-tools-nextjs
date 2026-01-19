@@ -2,15 +2,12 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { usePathname } from 'next/navigation'
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const pathname = usePathname()
-  const isConsole = pathname.startsWith('/tools/console')
-  const headerHeightClass = isConsole ? 'h-12' : 'h-16'
-  const logoTextClass = isConsole ? 'text-lg' : 'text-xl'
-  const containerClass = isConsole ? 'w-full px-2 sm:px-4' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
+  const headerHeightClass = 'h-12'
+  const logoTextClass = 'text-lg'
+  const containerClass = 'w-full px-3 sm:px-4'
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#161724]/90 backdrop-blur-md border-b border-[#5973ff]/15">

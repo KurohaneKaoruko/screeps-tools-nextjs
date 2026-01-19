@@ -1,5 +1,10 @@
 import Link from 'next/link'
 import { tools } from '@/lib/tools'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: '工具集 | Screeps Tools',
+}
 
 export default function ToolsPage() {
   return (
