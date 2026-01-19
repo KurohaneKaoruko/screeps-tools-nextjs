@@ -345,7 +345,6 @@ export default function ConsolePage() {
   const MAX_SUGGESTIONS = 8
   const COMMAND_INPUT_MIN_HEIGHT = 44
   const COMMAND_INPUT_MAX_HEIGHT = 180
-  const MAX_HTML_IFRAME_HEIGHT = 320
 
   const looksLikeHtmlMessage = (raw: string) =>
     /<\/?[a-zA-Z][\s>]/.test(raw) || raw.includes('<style') || raw.includes('<br')
@@ -366,7 +365,7 @@ export default function ConsolePage() {
         font-size: 12px;
         line-height: 1.25;
         white-space: pre-wrap;
-        overflow: auto;
+        overflow: hidden;
       }
       a { color: #5973ff; }
     </style>
@@ -606,7 +605,7 @@ export default function ConsolePage() {
       const id = typeof data.id === 'string' ? data.id : ''
       const height = typeof data.height === 'number' ? data.height : NaN
       if (!id || !Number.isFinite(height)) return
-      const next = Math.max(24, Math.min(height, MAX_HTML_IFRAME_HEIGHT))
+      const next = Math.max(24, height)
       setHtmlIframeHeights(prev => (prev[id] === next ? prev : { ...prev, [id]: next }))
     }
     window.addEventListener('message', onMessage)
