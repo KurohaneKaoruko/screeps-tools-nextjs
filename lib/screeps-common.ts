@@ -117,9 +117,10 @@ export function calculateGPLLevel(power: number): number {
 }
 
 export function formatNumber(num: number): string {
-  if (num >= 1000000000) return (num / 1000000000).toFixed(2) + 'M'
-  if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M'
-  if (num >= 1000) return (num / 1000).toFixed(2) + 'K'
+  if (num === undefined) return 'N/A'
+  if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B'
+  if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M'
+  if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K'
   return num.toString()
 }
 
