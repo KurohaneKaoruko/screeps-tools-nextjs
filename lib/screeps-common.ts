@@ -136,19 +136,31 @@ export const RESOURCE_CATEGORIES: Record<string, { name: string; resources: stri
   },
   '基础矿物': {
     name: '基础矿物',
-    resources: ['H', 'O', 'U', 'L', 'K', 'Z', 'X', 'G']
+    resources: ['H', 'O', 'U', 'L', 'K', 'Z', 'X']
   },
-  '基础化合物': {
-    name: '基础化合物',
-    resources: [
-      // 按列排列：基础 | U系 | Z系 | K系 | L系 | G系
-      'OH',  'UH',   'ZH',   'KH',   'LH',   'GH',
-      'ZK',  'UH2O', 'ZH2O', 'KH2O', 'LH2O', 'GH2O',
-      'UL',  'XUH2O','XZH2O','XKH2O','XLH2O','XGH2O',
-      'G',   'UO',   'ZO',   'KO',   'LO',   'GO',
-             'UHO2', 'ZHO2', 'KHO2', 'LHO2', 'GHO2',
-             'XUHO2','XZHO2','XKHO2','XLHO2','XGHO2',
-    ]
+  '中间产物': {
+    name: '中间产物',
+    resources: ['OH', 'ZK', 'UL', 'G']
+  },
+  '提升化合物 (U系)': {
+    name: '提升化合物 (U系)',
+    resources: ['UH', 'UH2O', 'XUH2O', 'UO', 'UHO2', 'XUHO2']
+  },
+  '提升化合物 (Z系)': {
+    name: '提升化合物 (Z系)',
+    resources: ['ZH', 'ZH2O', 'XZH2O', 'ZO', 'ZHO2', 'XZHO2']
+  },
+  '提升化合物 (K系)': {
+    name: '提升化合物 (K系)',
+    resources: ['KH', 'KH2O', 'XKH2O', 'KO', 'KHO2', 'XKHO2']
+  },
+  '提升化合物 (L系)': {
+    name: '提升化合物 (L系)',
+    resources: ['LH', 'LH2O', 'XLH2O', 'LO', 'LHO2', 'XLHO2']
+  },
+  '提升化合物 (G系)': {
+    name: '提升化合物 (G系)',
+    resources: ['GH', 'GH2O', 'XGH2O', 'GO', 'GHO2', 'XGHO2']
   },
   '压缩资源': {
     name: '压缩资源',
@@ -158,19 +170,24 @@ export const RESOURCE_CATEGORIES: Record<string, { name: string; resources: stri
       'ghodium_melt', 'oxidant', 'reductant', 'purifier'
     ]
   },
-  '高级资源': {
-    name: '高级资源',
-    resources: [
-      // 基础商品
-      'composite', 'crystal', 'liquid',
-      // 金属系列 (mechanical)
-      'metal', 'alloy', 'tube', 'fixture', 'frame', 'hydraulics', 'machine',
-      // 生物系列 (biological)
-      'biomass', 'cell', 'phlegm', 'tissue', 'muscle', 'organoid', 'organism',
-      // 电子系列 (electronical)
-      'silicon', 'wire', 'switch', 'transistor', 'microchip', 'circuit', 'device',
-      // 神秘系列 (mystical)
-      'mist', 'condensate', 'concentrate', 'extract', 'spirit', 'emanation', 'essence'
-    ]
+  '商品 (基础)': {
+    name: '商品 (基础)',
+    resources: ['composite', 'crystal', 'liquid']
+  },
+  '商品 (机械)': {
+    name: '商品 (机械)',
+    resources: ['metal', 'alloy', 'tube', 'fixture', 'frame', 'hydraulics', 'machine']
+  },
+  '商品 (生物)': {
+    name: '商品 (生物)',
+    resources: ['biomass', 'cell', 'phlegm', 'tissue', 'muscle', 'organoid', 'organism']
+  },
+  '商品 (电子)': {
+    name: '商品 (电子)',
+    resources: ['silicon', 'wire', 'switch', 'transistor', 'microchip', 'circuit', 'device']
+  },
+  '商品 (神秘)': {
+    name: '商品 (神秘)',
+    resources: ['mist', 'condensate', 'concentrate', 'extract', 'spirit', 'emanation', 'essence']
   }
 }
