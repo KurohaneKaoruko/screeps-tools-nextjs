@@ -50,39 +50,82 @@ export default function CustomSelect({ value, onChange, options, disabled, place
       return
     }
 
+    let animationFrameId: number
+
     const update = () => {
       const btn = buttonRef.current
       if (!btn) return
       const rect = btn.getBoundingClientRect()
       const margin = 8
-      const desiredWidth = rect.width
+      
       const availableBelow = window.innerHeight - (rect.bottom + margin)
       const availableAbove = rect.top - margin
       const openUp = availableBelow < 140 && availableAbove > 160
+      
       const maxHeight = Math.max(
         120,
-        Math.min(192, openUp ? availableAbove - margin : availableBelow - margin)
+        Math.min(600, openUp ? availableAbove - margin : availableBelow - margin)
       )
+      
       const top = openUp ? rect.top - margin : rect.bottom + margin
-      const left = Math.min(Math.max(rect.left, margin), window.innerWidth - desiredWidth - margin)
-      setMenuStyle({
+      
+      // Horizontal positioning logic
+      const spaceRight = window.innerWidth - rect.left - margin
+      const spaceLeft = rect.right - margin
+      
+      let left: number | undefined
+      let right: number | undefined
+      let maxWidth: number
+      const maxMenuWidth = 320 // Reduced max width as requested
+      
+      // Prefer left alignment if there's enough space (at least button width or 200px)
+      if (spaceRight >= Math.max(200, rect.width)) {
+        left = rect.left
+        maxWidth = Math.min(spaceRight, maxMenuWidth)
+      } else if (spaceLeft >= Math.max(200, rect.width)) {
+        // Align right edge of menu to right edge of button
+        right = window.innerWidth - rect.right
+        maxWidth = Math.min(spaceLeft, maxMenuWidth)
+      } else {
+        // Fallback: use maximum available width
+        left = margin
+        maxWidth = Math.min(window.innerWidth - margin * 2, maxMenuWidth)
+      }
+
+      const newStyle: CSSProperties = {
         position: 'fixed',
         top,
         left,
-        width: desiredWidth,
+        right,
+        minWidth: rect.width,
+        width: 'auto',
+        maxWidth,
         maxHeight,
         transform: openUp ? 'translateY(-100%)' : undefined,
         zIndex: 9999
+      }
+
+      setMenuStyle(prev => {
+        if (prev &&
+            prev.top === newStyle.top &&
+            prev.left === newStyle.left &&
+            prev.right === newStyle.right &&
+            prev.width === newStyle.width &&
+            prev.maxWidth === newStyle.maxWidth &&
+            prev.maxHeight === newStyle.maxHeight &&
+            prev.transform === newStyle.transform) {
+          return prev
+        }
+        return newStyle
       })
+
+      animationFrameId = requestAnimationFrame(update)
     }
 
     update()
-    const onScrollOrResize = () => update()
-    window.addEventListener('resize', onScrollOrResize)
-    window.addEventListener('scroll', onScrollOrResize, true)
+    
     return () => {
-      window.removeEventListener('resize', onScrollOrResize)
-      window.removeEventListener('scroll', onScrollOrResize, true)
+      if (animationFrameId) cancelAnimationFrame(animationFrameId)
     }
   }, [isOpen])
 
@@ -110,7 +153,7 @@ export default function CustomSelect({ value, onChange, options, disabled, place
                 onChange(option.value)
                 setIsOpen(false)
               }}
-              className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+              className={`w-full px-3 py-2 text-left text-sm whitespace-nowrap transition-colors ${
                 option.value === value
                   ? 'bg-[#5973ff]/20 text-[#5973ff]'
                   : 'text-[#909fc4] hover:bg-[#2c467e]/30 hover:text-white'
