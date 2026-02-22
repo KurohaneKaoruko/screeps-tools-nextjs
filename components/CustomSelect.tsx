@@ -14,9 +14,17 @@ interface CustomSelectProps {
   options: Option[]
   disabled?: boolean
   placeholder?: string
+  menuMode?: 'portal' | 'inline'
 }
 
-export default function CustomSelect({ value, onChange, options, disabled, placeholder = '请选择' }: CustomSelectProps) {
+export default function CustomSelect({
+  value,
+  onChange,
+  options,
+  disabled,
+  placeholder = '请选择',
+  menuMode = 'portal'
+}: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -45,6 +53,11 @@ export default function CustomSelect({ value, onChange, options, disabled, place
   }, [])
 
   useEffect(() => {
+    if (menuMode !== 'portal') {
+      setMenuStyle(null)
+      return
+    }
+
     if (!isOpen) {
       setMenuStyle(null)
       return
@@ -127,7 +140,7 @@ export default function CustomSelect({ value, onChange, options, disabled, place
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId)
     }
-  }, [isOpen])
+  }, [isOpen, menuMode])
 
   useEffect(() => {
     const el = menuRef.current
@@ -136,13 +149,16 @@ export default function CustomSelect({ value, onChange, options, disabled, place
   }, [isOpen, menuStyle])
 
   const renderMenu = () => {
-    if (!isOpen || !menuStyle) return null
-    return createPortal(
+    if (!isOpen) return null
+
+    const menuContent = (
       <div
         ref={menuRef}
         tabIndex={-1}
-        style={menuStyle}
-        className="bg-[#1d2027] border border-[#5973ff]/20 rounded-lg shadow-xl overflow-hidden outline-none"
+        style={menuMode === 'portal' ? menuStyle ?? undefined : undefined}
+        className={`bg-[#1d2027] border border-[#5973ff]/20 rounded-lg shadow-xl overflow-hidden outline-none ${
+          menuMode === 'inline' ? 'mt-2 w-full' : ''
+        }`}
       >
         <div className="overflow-y-auto max-h-full">
           {options.map((option) => (
@@ -163,9 +179,15 @@ export default function CustomSelect({ value, onChange, options, disabled, place
             </button>
           ))}
         </div>
-      </div>,
-      document.body
+      </div>
     )
+
+    if (menuMode === 'inline') {
+      return menuContent
+    }
+
+    if (!menuStyle) return null
+    return createPortal(menuContent, document.body)
   }
 
   if (disabled) {

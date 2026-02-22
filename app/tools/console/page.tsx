@@ -440,8 +440,6 @@ export default function ConsolePage() {
   const [identityKey, setIdentityKey] = useState('')
   const identityDebounceTimeoutRef = useRef<number | null>(null)
   const commandInputRef = useRef<HTMLTextAreaElement>(null)
-  const settingsButtonRef = useRef<HTMLButtonElement>(null)
-  const settingsPanelRef = useRef<HTMLDivElement>(null)
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false)
@@ -540,21 +538,6 @@ export default function ConsolePage() {
       }
     }
   }, [token, targetUsername, connectionMode])
-
-  useEffect(() => {
-    if (!isSidebarOpen) return
-    const onPointerDown = (e: MouseEvent) => {
-      const panel = settingsPanelRef.current
-      const btn = settingsButtonRef.current
-      const target = e.target as Node | null
-      if (!target) return
-      if (panel?.contains(target)) return
-      if (btn?.contains(target)) return
-      setIsSidebarOpen(false)
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [isSidebarOpen])
 
   useEffect(() => {
     if (!identityKey) {
@@ -833,15 +816,14 @@ export default function ConsolePage() {
     <div className="h-screen box-border pt-12 screeps-bg overflow-hidden">
       <div className="grid-bg" />
       
-      <div className="h-full w-full px-2 sm:px-4 py-3 flex flex-col gap-3 box-border">
+      <div className="h-full w-full px-3 sm:px-5 py-4 flex flex-col gap-4 box-border">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative">
+        <div className="flex items-center justify-between rounded-xl border border-[#5973ff]/15 bg-[#131827]/55 backdrop-blur-sm px-3 sm:px-4 py-2.5">
+          <div className="flex items-center gap-3 min-w-0">
+            <div>
               <button
-                ref={settingsButtonRef}
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className="relative z-30 p-2 rounded-lg bg-[#1d2027]/60 border border-[#5973ff]/10 text-[#909fc4] hover:text-white hover:bg-[#5973ff]/10 transition-colors"
+                className="relative z-50 p-2 rounded-lg bg-[#1d2027]/60 border border-[#5973ff]/10 text-[#909fc4] hover:text-white hover:bg-[#5973ff]/10 transition-colors"
                 title={isSidebarOpen ? "收起侧边栏" : "展开侧边栏"}
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -853,10 +835,33 @@ export default function ConsolePage() {
                 </svg>
               </button>
 
-              {isSidebarOpen && (
-                <div ref={settingsPanelRef} className="absolute left-0 top-full z-20 w-80 max-w-[calc(100vw-2rem)]">
-                  <div className="bg-[#1d2027]/90 backdrop-blur-md rounded-md p-4 border border-[#5973ff]/20 shadow-xl">
-                    <div className="flex items-center justify-between mb-4">
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">Screeps 控制台</h1>
+              <p className="hidden sm:block text-[11px] text-[#909fc4]/70 mt-0.5">实时日志与命令执行</p>
+            </div>
+            <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 bg-[#1d2027]/60 rounded-full border border-[#5973ff]/15">
+              <div className={`w-2 h-2 rounded-full ${
+                status === 'connected' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' :
+                status === 'connecting' || status === 'authenticating' ? 'bg-yellow-500 animate-pulse' :
+                status === 'error' ? 'bg-red-500' :
+                'bg-gray-500'
+              }`} />
+              <span className="text-xs text-[#909fc4]">
+                {status === 'connected' ? '已连接' :
+                 status === 'connecting' ? '连接中...' :
+                 status === 'authenticating' ? '认证中...' :
+                 status === 'error' ? '连接错误' :
+                 '未连接'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 flex gap-3 sm:gap-4">
+          <div className={`${isSidebarOpen ? 'w-72 opacity-100' : 'w-0 opacity-0 overflow-hidden'} shrink-0 transition-all duration-300 ease-in-out`}>
+            <div className="h-full w-72 bg-[#1b1f2a]/95 backdrop-blur-xl rounded-xl p-4 border border-[#5973ff]/20 shadow-[0_18px_50px_rgba(7,10,24,0.55)] flex flex-col">
+                    <div className="flex items-start justify-between mb-4 pb-2 border-b border-[#5973ff]/10">
                       <h3 className="text-[#e5e7eb] font-semibold text-xs">连接设置</h3>
                       <button
                         type="button"
@@ -870,7 +875,7 @@ export default function ConsolePage() {
                       </button>
                     </div>
 
-                    <div className="space-y-4 max-h-[calc(100vh-160px)] overflow-auto pr-1">
+                    <div className="space-y-4 overflow-y-auto hide-scrollbar pr-1 flex-1">
                       <div>
                         <div className="flex gap-2 p-1 bg-[#161724]/50 rounded-lg border border-[#5973ff]/10">
                           <button
@@ -997,14 +1002,14 @@ export default function ConsolePage() {
                             <button
                               onClick={saveToken}
                               disabled={!tokenName.trim()}
-                              className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm transition-colors border ${
+                              className={`h-9 px-3 flex items-center justify-center rounded-lg text-xs font-medium transition-colors border ${
                                 tokenName.trim()
                                   ? 'bg-[#5973ff]/10 hover:bg-[#5973ff]/20 text-[#5973ff] border-[#5973ff]/20 cursor-pointer'
                                   : 'bg-[#909fc4]/5 text-[#909fc4]/30 border-[#909fc4]/10 cursor-not-allowed'
                               }`}
                               title="保存"
                             >
-                              💾
+                              保存
                             </button>
                           </div>
                         </div>
@@ -1012,9 +1017,10 @@ export default function ConsolePage() {
 
                       <div>
                         <label className="text-xs text-[#909fc4] mb-1.5 block">Shard</label>
-                        <div className="flex gap-2">
+                        <div className="w-full">
                           <CustomSelect
                             value={['shard0', 'shard1', 'shard2', 'shard3'].includes(shard) ? shard : 'custom'}
+                            menuMode="inline"
                             onChange={(val) => {
                               if (val !== 'custom') {
                                 setShard(val)
@@ -1071,33 +1077,13 @@ export default function ConsolePage() {
                       )}
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-            <h1 className="text-2xl font-bold text-white">Screeps 控制台</h1>
-            <div className="flex items-center gap-2 px-3 py-1 bg-[#1d2027]/60 rounded-full border border-[#5973ff]/10">
-              <div className={`w-2 h-2 rounded-full ${
-                status === 'connected' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' :
-                status === 'connecting' || status === 'authenticating' ? 'bg-yellow-500 animate-pulse' :
-                status === 'error' ? 'bg-red-500' :
-                'bg-gray-500'
-              }`} />
-              <span className="text-xs text-[#909fc4]">
-                {status === 'connected' ? '已连接' :
-                 status === 'connecting' ? '连接中...' :
-                 status === 'authenticating' ? '认证中...' :
-                 status === 'error' ? '连接错误' :
-                 '未连接'}
-              </span>
-            </div>
-          </div>
-        </div>
+              </div>
+            
 
-
-        <div className="relative flex-1 min-h-0">
-          <div className="flex flex-col h-full min-h-0 bg-[#1d2027]/60 backdrop-blur-sm rounded-md border border-[#5973ff]/10 overflow-hidden">
+          <div className="relative flex-1 min-h-0 min-w-0">
+          <div className="flex flex-col h-full min-h-0 bg-[#151a28]/65 backdrop-blur-sm rounded-xl border border-[#5973ff]/10 shadow-[0_20px_70px_rgba(3,6,18,0.45)] overflow-hidden">
             {/* Toolbar */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[#5973ff]/10 bg-[#161724]/50">
+            <div className="flex items-center justify-between px-4 sm:px-5 py-2.5 border-b border-[#5973ff]/10 bg-[#161724]/60">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50" />
                 <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
@@ -1125,7 +1111,7 @@ export default function ConsolePage() {
             {/* Output */}
             <div 
                 ref={logsContainerRef}
-                className="flex-1 min-h-0 overflow-y-auto p-4 font-mono text-xs leading-tight space-y-1 scroll-smooth"
+                className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 font-mono text-xs leading-tight space-y-1.5 scroll-smooth"
             >
               {logs.length === 0 && (
                 <div className="text-[#909fc4]/40 text-center mt-20">
@@ -1161,13 +1147,15 @@ export default function ConsolePage() {
 
 
             {/* Input */}
-            <div className="border-t border-[#5973ff]/10 bg-[#161724]/30 relative">
+            <div className="border-t border-[#5973ff]/10 bg-[#141a2b]/45 relative">
                {/* Saved Commands Toolbar */}
-               <div className="flex items-center justify-between px-4 py-2 border-b border-[#5973ff]/5">
-                  <div className="flex-1" /> {/* Spacer */}
+               <div className="flex items-center justify-between px-4 sm:px-5 py-2 border-b border-[#5973ff]/5">
+                  <div className="text-[11px] text-[#909fc4]/70">
+                    Press Enter to run, Shift + Enter for newline
+                  </div>
                   <button 
                      onClick={() => setIsSavedCommandsOpen(!isSavedCommandsOpen)}
-                     className="flex items-center gap-2 text-xs text-[#909fc4] hover:text-white transition-colors"
+                     className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs text-[#909fc4] hover:text-white hover:bg-[#5973ff]/10 transition-colors"
                   >
                      常用命令
                      <svg className={`w-3 h-3 transition-transform ${isSavedCommandsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1207,9 +1195,9 @@ export default function ConsolePage() {
                                           e.stopPropagation()
                                           deleteCommand(cmd.id)
                                       }}
-                                      className="text-red-500/50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-2 px-1"
+                                      className="text-red-500/50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-2 p-1"
                                   >
-                                      ×
+                                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                   </button>
                               </div>
                           ))}
@@ -1233,22 +1221,22 @@ export default function ConsolePage() {
                                type="button"
                                onClick={saveCommand}
                                disabled={!command.trim()}
-                               className={`w-8 h-8 flex items-center justify-center rounded text-sm transition-colors border ${
+                               className={`h-8 px-3 flex items-center justify-center rounded text-[11px] font-medium transition-colors border ${
                                  command.trim()
                                    ? 'bg-[#5973ff]/10 hover:bg-[#5973ff]/20 text-[#5973ff] border-[#5973ff]/20 cursor-pointer'
                                    : 'bg-[#909fc4]/5 text-[#909fc4]/30 border-[#909fc4]/10 cursor-not-allowed'
                                }`}
                                title="保存 (未输入名称将自动生成)"
                              >
-                               💾
-                             </button>
+                               保存
+                            </button>
                            </div>
                        </div>
                     </div>
                  </div>
                )}
 
-              <div className="p-4 relative">
+              <div className="p-4 sm:p-5 relative">
                 <div className="flex gap-2 items-center">
                   <div className="relative flex-1">
                     {connectionMode !== 'spectator' && isAutocompleteOpen && suggestions.length > 0 && (
@@ -1284,7 +1272,7 @@ export default function ConsolePage() {
                       disabled={connectionMode === 'spectator'}
                       placeholder={connectionMode === 'spectator' ? "观察模式下无法输入命令" : "输入代码..."}
                       style={{ minHeight: COMMAND_INPUT_MIN_HEIGHT, maxHeight: COMMAND_INPUT_MAX_HEIGHT }}
-                      className={`w-full bg-[#0b0d0f]/50 border border-[#5973ff]/20 rounded-lg p-3 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50 resize-none ${
+                      className={`w-full bg-[#0b0d0f]/50 border border-[#5973ff]/20 rounded-lg p-3 text-white font-mono text-sm placeholder:text-[#909fc4]/45 focus:outline-none focus:ring-2 focus:ring-[#5973ff]/50 resize-none ${
                         connectionMode === 'spectator' ? 'cursor-not-allowed opacity-50' : ''
                       }`}
                     />
@@ -1310,7 +1298,9 @@ export default function ConsolePage() {
             </div>
           </div>
         </div>
+        </div>
       </div>
     </div>
   )
 }
+
