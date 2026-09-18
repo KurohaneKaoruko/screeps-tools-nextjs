@@ -130,6 +130,9 @@ export function useScreepsSocket(
         
         if (data.startsWith('auth failed')) {
           setStatus('error')
+          // 清空凭证，避免 onclose 触发带着失效 Token 无限重连
+          tokenRef.current = ''
+          targetUsernameRef.current = ''
           ws.close()
           if (onErrorRef.current) {
               onErrorRef.current(new Error('WebSocket authentication failed'))
@@ -208,11 +211,12 @@ export function useScreepsSocket(
 
       ws.onclose = () => {
         console.log('WS Closed')
-        if (status !== 'disconnected') {
+        // 注意：这里必须读取 ref 而不是闭包中的 status（后者永远停留在 connect 调用时的旧值）
+        if (statusRef.current !== 'disconnected') {
              setStatus('disconnected')
              // 简单的自动重连逻辑
              reconnectTimeoutRef.current = setTimeout(() => {
-                 if (tokenRef.current) {
+                 if (tokenRef.current || targetUsernameRef.current) {
                      connect(tokenRef.current, targetUsernameRef.current)
                  }
              }, 3000)

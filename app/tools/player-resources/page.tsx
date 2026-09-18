@@ -1,15 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { calculateGCLLevel, calculateGPLLevel, formatNumber, RESOURCE_CATEGORIES } from '@/lib/screeps-common'
+import { useState, useEffect } from 'react'
+import { calculateGCLLevel, calculateGPLLevel, formatNumber, RESOURCE_CATEGORIES, KNOWN_SHARDS, sortShards, type ShardInfo } from '@/lib/screeps-common'
 import CustomSelect from '@/components/CustomSelect'
 
-const SHARDS = [
+// 兜底 shard 选项；页面加载后会从官方 shards/info 拉取最新列表（含 shardX）
+const FALLBACK_SHARDS = [
   { value: 'all', label: '所有 Shard' },
-  { value: 'shard0', label: 'shard0' },
-  { value: 'shard1', label: 'shard1' },
-  { value: 'shard2', label: 'shard2' },
-  { value: 'shard3', label: 'shard3' },
+  ...KNOWN_SHARDS.map(s => ({ value: s, label: s })),
 ]
 
 // 资源颜色映射
@@ -191,6 +189,24 @@ export default function PlayerResourcesPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [data, setData] = useState<PlayerResourcesResponse | null>(null)
+  const [shardOptions, setShardOptions] = useState(FALLBACK_SHARDS)
+
+  // 动态获取官方 shard 列表（含 shardX 等新分片）
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/screeps?action=shards')
+      .then(res => res.json())
+      .then((result: { ok: number; shards?: ShardInfo[] }) => {
+        if (!cancelled && result?.ok === 1 && Array.isArray(result.shards) && result.shards.length > 0) {
+          setShardOptions([
+            { value: 'all', label: '所有 Shard' },
+            ...sortShards(result.shards.map(s => s.name)).map(s => ({ value: s, label: s }))
+          ])
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const fetchData = async () => {
     if (!username.trim()) {
@@ -270,7 +286,7 @@ export default function PlayerResourcesPage() {
                 <CustomSelect
                   value={shard}
                   onChange={(val) => setShard(val)}
-                  options={SHARDS}
+                  options={shardOptions}
                   placeholder="选择 Shard"
                 />
               </div>

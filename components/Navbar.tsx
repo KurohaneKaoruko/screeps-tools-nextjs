@@ -1,13 +1,28 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const pathname = usePathname()
   const headerHeightClass = 'h-12'
   const logoTextClass = 'text-lg'
   const containerClass = 'w-full px-3 sm:px-4'
+
+  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href))
+  const linkClass = (href: string) =>
+    `text-sm font-medium transition-colors ${isActive(href) ? 'text-white' : 'text-[#909fc4] hover:text-white'}`
+  const navLinks = [
+    { href: '/', label: '首页' },
+    { href: '/tools', label: '工具' },
+  ]
+
+  // 路由变化时自动收起移动端菜单
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [pathname])
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#161724]/90 backdrop-blur-md border-b border-[#5973ff]/15">
@@ -25,18 +40,11 @@ export default function Navbar() {
           
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link 
-              href="/" 
-              className="text-[#909fc4] hover:text-white transition-colors text-sm font-medium"
-            >
-              首页
-            </Link>
-            <Link 
-              href="/tools" 
-              className="text-[#909fc4] hover:text-white transition-colors text-sm font-medium"
-            >
-              工具
-            </Link>
+            {navLinks.map(link => (
+              <Link key={link.href} href={link.href} className={linkClass(link.href)}>
+                {link.label}
+              </Link>
+            ))}
             <a 
               href="https://docs.screeps.com/" 
               target="_blank"
@@ -79,20 +87,11 @@ export default function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-[#5973ff]/15">
             <nav className="flex flex-col space-y-4">
-              <Link 
-                href="/" 
-                className="text-[#909fc4] hover:text-white transition-colors text-sm font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                首页
-              </Link>
-              <Link 
-                href="/tools" 
-                className="text-[#909fc4] hover:text-white transition-colors text-sm font-medium"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                工具
-              </Link>
+              {navLinks.map(link => (
+                <Link key={link.href} href={link.href} className={linkClass(link.href)}>
+                  {link.label}
+                </Link>
+              ))}
               <a 
                 href="https://docs.screeps.com/" 
                 target="_blank"

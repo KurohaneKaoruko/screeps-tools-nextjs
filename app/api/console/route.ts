@@ -16,8 +16,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 使用共享的 Server API 包装器
+    // shard 可能为空字符串（前端自定义输入被清空），回退到默认 shard
     const api = new ScreepsServerApi(token)
-    const result = await api.executeConsoleCommand(expression, shard)
+    const result = await api.executeConsoleCommand(expression, shard || 'shard0')
 
     return NextResponse.json(result)
 

@@ -2,27 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import type { NukeData, NukesResponse } from '@/lib/screeps-common'
+import { formatDuration, formatTickSpeed, sortShards, KNOWN_SHARDS } from '@/lib/screeps-common'
 
 interface NukeDataWithTime extends NukeData {
   ticksToLand: number
   secondsToLand: number
-}
-
-function formatTimeToLand(timeToLand: number): string {
-  if (timeToLand <= 0) return '即将爆炸'
-  
-  const totalSeconds = timeToLand
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = Math.floor(totalSeconds % 60)
-  
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`
-  } else if (minutes > 0) {
-    return `${minutes}m ${seconds}s`
-  } else {
-    return `${seconds}s`
-  }
 }
 
 function getUrgencyColor(timeToLand: number): string {
@@ -118,15 +102,18 @@ export default function NukeStatusPage() {
       }
       nukesByShard[nuke.shard].push(nuke)
     }
+    // 紧急的排前面
+    for (const list of Object.values(nukesByShard)) {
+      list.sort((a, b) => a.secondsToLand - b.secondsToLand)
+    }
   }
 
-  function formatTickSpeed(ms: number): string {
-    if (!Number.isFinite(ms) || ms <= 0) return '-'
-    if (ms % 1000 === 0) return `${ms / 1000}秒`
-    return `${Math.round(ms)}ms`
-  }
-
-  const shards = ['shard0', 'shard1', 'shard2', 'shard3']
+  // 动态 shard 列表：官方 shards/info 返回的分片（含 shardX）∪ 有 Nuke 的分片 ∪ 已知兜底列表
+  const shards = sortShards(new Set([
+    ...Object.keys(data?.shardTickSpeeds || {}),
+    ...Object.keys(nukesByShard),
+    ...KNOWN_SHARDS
+  ]))
 
   return (
     <div className="min-h-screen screeps-bg">
@@ -221,6 +208,9 @@ export default function NukeStatusPage() {
                             <div className="flex items-center gap-1.5">
                               <div className="w-1.5 h-1.5 rounded-full bg-[#5973ff]" />
                               <h2 className="text-sm font-bold text-white">{shard}</h2>
+                              {shard === 'shardX' && (
+                                <span className="px-1 py-px text-[10px] font-medium rounded bg-[#a459ff]/20 text-[#a459ff] border border-[#a459ff]/30">⚡2x</span>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               {typeof tickMsForShard === 'number' && tickMsForShard > 0 && (
@@ -282,7 +272,7 @@ export default function NukeStatusPage() {
                                   </div>
                                   <div className="shrink-0 text-right">
                                     <div className={`text-sm font-bold ${getUrgencyColor(nuke.secondsToLand)}`}>
-                                      {formatTimeToLand(nuke.secondsToLand)}
+                                      {formatDuration(nuke.secondsToLand)}
                                     </div>
                                     <div className="px-1.5 py-0.5 bg-[#5973ff]/20 rounded inline-flex items-center gap-0.5">
                                       <div className="text-sm font-mono font-bold text-[#5973ff]">

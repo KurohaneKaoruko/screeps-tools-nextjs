@@ -5,6 +5,14 @@ import { ScreepsApiClient } from '@/lib/screeps-client'
 import { useScreepsSocket } from '@/hooks/useScreepsSocket'
 import CustomSelect from '@/components/CustomSelect'
 import { addCommandToHistory, computeConsoleIdentityKey, readCommandHistory } from '@/lib/console-storage'
+import { KNOWN_SHARDS } from '@/lib/screeps-common'
+
+// Shard 下拉选项（含 shardX 快速分片）
+const SHARD_OPTIONS = [
+  ...KNOWN_SHARDS.map(s => ({ value: s, label: s === 'shardX' ? 'shardX ⚡' : s })),
+  { value: 'custom', label: '自定义 / Season' }
+]
+const isKnownShard = (s: string) => KNOWN_SHARDS.includes(s)
 
 interface ConsoleLog {
   _id?: string
@@ -732,7 +740,7 @@ export default function ConsolePage() {
         setCommandHistory(updated)
       }
 
-      const api = new ScreepsApiClient(shard, token)
+      const api = new ScreepsApiClient(shard || 'shard0', token)
       const data = await api.executeConsoleCommand(command)
       
       if (data.error) {
@@ -1019,7 +1027,7 @@ export default function ConsolePage() {
                         <label className="text-xs text-[#909fc4] mb-1.5 block">Shard</label>
                         <div className="w-full">
                           <CustomSelect
-                            value={['shard0', 'shard1', 'shard2', 'shard3'].includes(shard) ? shard : 'custom'}
+                            value={isKnownShard(shard) ? shard : 'custom'}
                             menuMode="inline"
                             onChange={(val) => {
                               if (val !== 'custom') {
@@ -1034,16 +1042,10 @@ export default function ConsolePage() {
                                 setShard('')
                               }
                             }}
-                            options={[
-                              { value: 'shard0', label: 'shard0' },
-                              { value: 'shard1', label: 'shard1' },
-                              { value: 'shard2', label: 'shard2' },
-                              { value: 'shard3', label: 'shard3' },
-                              { value: 'custom', label: '自定义 / Season' }
-                            ]}
+                            options={SHARD_OPTIONS}
                           />
                         </div>
-                        {!['shard0', 'shard1', 'shard2', 'shard3'].includes(shard) && (
+                        {!isKnownShard(shard) && (
                           <input
                             type="text"
                             value={shard}

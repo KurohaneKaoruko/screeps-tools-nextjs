@@ -109,7 +109,7 @@ export default function Home() {
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <h3 className="text-xl font-semibold text-[#e5e7eb] group-hover:text-white transition-colors">
-                      {tool.name}
+                      <span className="mr-2" aria-hidden>{tool.icon}</span>{tool.name}
                     </h3>
                     <span className={`px-3 py-1 text-xs font-medium rounded-full ${
                       tool.statusColor === 'green' 

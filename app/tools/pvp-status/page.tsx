@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { KNOWN_SHARDS, sortShards, type ShardInfo } from '@/lib/screeps-common'
 
 interface PvPRoomData {
   _id: string
@@ -16,10 +17,7 @@ interface PvPShardData {
 interface PvPApiResponse {
   ok: number
   pvp: {
-    shard0?: PvPShardData
-    shard1?: PvPShardData
-    shard2?: PvPShardData
-    shard3?: PvPShardData
+    [key: string]: PvPShardData | undefined
   }
   shardTickSpeeds?: Record<string, number>
   error?: string
@@ -31,6 +29,21 @@ export default function PvPStatusPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [data, setData] = useState<PvPApiResponse | null>(null)
+  const [shardList, setShardList] = useState<string[]>([...KNOWN_SHARDS])
+
+  // 动态获取官方 shard 列表（含 shardX 等新分片）
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/screeps?action=shards')
+      .then(res => res.json())
+      .then((result: { ok: number; shards?: ShardInfo[] }) => {
+        if (!cancelled && result?.ok === 1 && Array.isArray(result.shards) && result.shards.length > 0) {
+          setShardList(sortShards(result.shards.map(s => s.name)))
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const fetchData = async () => {
     const intervalNum = parseInt(interval)
@@ -58,7 +71,6 @@ export default function PvPStatusPage() {
     }
   }
 
-  const shards = ['shard3', 'shard2', 'shard1', 'shard0'] as const
   const roomsByShard: Record<string, PvPRoomData[]> = {}
   const activeShards: string[] = []
   let totalRooms = 0
@@ -87,6 +99,10 @@ export default function PvPStatusPage() {
       avgTickSpeed = totalTickSpeed / shardCount
     }
   }
+
+  // 展示顺序：官方列表倒序（新分片在前），并合入数据中实际出现的分片
+  const shards = sortShards(new Set([...shardList, ...Object.keys(roomsByShard)])).reverse()
+  const totalKnownShards = new Set([...shardList, ...Object.keys(data?.pvp || {})]).size
 
   function formatTickSpeed(ms: number): string {
     const seconds = (ms / 1000).toFixed(1)
@@ -141,7 +157,7 @@ export default function PvPStatusPage() {
                   <div className="bg-[#0b0d0f]/60 rounded-lg p-3 border border-[#5973ff]/10">
                     <div className="text-xs text-[#909fc4]">活跃 Shard</div>
                     <div className="text-lg font-bold text-white">{activeShards.length}</div>
-                    <div className="text-xs text-[#909fc4]/60">共 4 个 Shard</div>
+                    <div className="text-xs text-[#909fc4]/60">共 {totalKnownShards} 个 Shard</div>
                   </div>
                   <div className="bg-[#0b0d0f]/60 rounded-lg p-3 border border-[#ff7379]/10">
                     <div className="text-xs text-[#909fc4]">战斗房间数</div>
@@ -177,7 +193,12 @@ export default function PvPStatusPage() {
                     return (
                       <div key={shard} className="bg-[#1d2027]/60 backdrop-blur-sm rounded-md p-4 border border-[#5973ff]/10">
                         <div className="flex items-center justify-between mb-3">
-                          <h2 className="text-sm font-semibold text-[#e5e7eb]">⚔️ {shard}</h2>
+                          <h2 className="text-sm font-semibold text-[#e5e7eb]">
+                            ⚔️ {shard}
+                            {shard === 'shardX' && (
+                              <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-[#a459ff]/20 text-[#a459ff] border border-[#a459ff]/30 align-middle">⚡2x</span>
+                            )}
+                          </h2>
                           <div className="flex items-center gap-3 text-xs text-[#909fc4]">
                             <span>
                               Tick: <span className="text-white font-mono">{shardTime.toLocaleString()}</span>

@@ -97,14 +97,124 @@ export interface PvPShardData {
 export interface PvPResponse {
   ok: number,
   pvp: {
-    shard0?: PvPShardData
-    shard1?: PvPShardData
-    shard2?: PvPShardData
-    shard3?: PvPShardData
     [key: string]: PvPShardData | undefined
   }
   shardTickSpeeds?: Record<string, number>
   error?: string
+}
+
+/** Shard 动态信息（tick 速度、房间数、玩家数） */
+export interface ShardInfo {
+  name: string
+  tick: number
+  rooms?: number
+  users?: number
+}
+
+export interface ShardsInfoResponse {
+  ok: number
+  shards: ShardInfo[]
+  error?: string
+}
+
+/** 市场资源概览统计 */
+export interface MarketResourceStat {
+  _id: string
+  count: number
+  avgPrice: number
+  stddevPrice: number
+}
+
+export interface MarketIndexResponse {
+  ok: number
+  shard: string
+  list: MarketResourceStat[]
+  error?: string
+}
+
+export interface MarketOrder {
+  _id: string
+  type: 'buy' | 'sell'
+  amount: number
+  remainingAmount: number
+  price: number
+  roomName: string
+}
+
+export interface MarketOrdersResponse {
+  ok: number
+  resourceType: string
+  shard?: string
+  orders: MarketOrder[]
+  error?: string
+}
+
+/** 房间信息查询结果 */
+export interface RoomLookupData {
+  name: string
+  shard: string
+  ownerUsername?: string | null
+  ownerLevel?: number | null
+  sign?: { username?: string; text: string; time: number } | null
+  status?: string
+  novice?: number | null
+  respawnArea?: number | null
+  gameTime?: number
+}
+
+export interface RoomLookupResponse {
+  ok: number
+  room?: RoomLookupData
+  error?: string
+}
+
+/**
+ * 已知 Shard 列表（含 2026-04 新增的 shardX，tick 速度约为其他 shard 的 2 倍）。
+ * 服务端返回的 shards action 会包含官方最新分片，此列表仅作为兜底。
+ */
+export const KNOWN_SHARDS: readonly string[] = ['shard0', 'shard1', 'shard2', 'shard3', 'shardX']
+
+export const DEFAULT_SHARD = 'shard0'
+
+/** 不区分 shard 的全局市场资源 */
+export const GLOBAL_MARKET_RESOURCES: readonly string[] = ['pixel', 'cpuUnlock', 'accessKey']
+
+/**
+ * 按 shard0 → shardN → shardX（及其它特殊分片）的顺序排序。
+ * 数字分片按编号升序，非数字分片排在数字分片之后并按名称排序。
+ */
+export function sortShards(names: Iterable<string>): string[] {
+  const numeric: { name: string; index: number }[] = []
+  const special: string[] = []
+  for (const name of names) {
+    const match = /^shard(\d+)$/i.exec(name)
+    if (match) {
+      numeric.push({ name, index: parseInt(match[1]!, 10) })
+    } else {
+      special.push(name)
+    }
+  }
+  numeric.sort((a, b) => a.index - b.index)
+  special.sort((a, b) => a.localeCompare(b))
+  return [...numeric.map(n => n.name), ...special]
+}
+
+/** 格式化 tick 速度显示（毫秒 → 秒或毫秒） */
+export function formatTickSpeed(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return '-'
+  if (ms % 1000 === 0) return (ms / 1000) + '秒'
+  return Math.round(ms) + 'ms'
+}
+
+/** 格式化剩余时长（秒 → "1h 23m 45s"） */
+export function formatDuration(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '即将爆炸'
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = Math.floor(totalSeconds % 60)
+  if (hours > 0) return hours + 'h ' + minutes + 'm ' + seconds + 's'
+  if (minutes > 0) return minutes + 'm ' + seconds + 's'
+  return seconds + 's'
 }
 
 export function calculateGCLLevel(gcl: number): number {
@@ -191,3 +301,9 @@ export const RESOURCE_CATEGORIES: Record<string, { name: string; resources: stri
     resources: ['mist', 'condensate', 'concentrate', 'extract', 'spirit', 'emanation', 'essence']
   }
 }
+
+/** 所有已知资源类型的扁平列表（市场查询用） */
+export const ALL_MARKET_RESOURCES: string[] = [
+  ...GLOBAL_MARKET_RESOURCES,
+  ...Object.values(RESOURCE_CATEGORIES).flatMap(c => c.resources)
+]

@@ -41,7 +41,7 @@ export default function ToolsPage() {
                 <div className="flex-1 ml-4">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="text-lg font-semibold text-[#e5e7eb] group-hover:text-white transition-colors">
-                      {tool.name}
+                      <span className="mr-1.5" aria-hidden>{tool.icon}</span>{tool.name}
                     </h3>
                     <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
                       tool.statusColor === 'green' 

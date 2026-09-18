@@ -9,7 +9,11 @@ import {
   NukesResponse, 
   PvPResponse, 
   PvPShardData, 
-  PvPRoomData 
+  PvPRoomData,
+  RoomLookupResponse,
+  GLOBAL_MARKET_RESOURCES,
+  KNOWN_SHARDS,
+  sortShards
 } from '@/lib/screeps-common'
 
 const api = new ScreepsServerApi().raw
@@ -346,7 +350,85 @@ async function getNukes(shards: string[]): Promise<NukesResponse> {
     
     return { ok: 1, nukes: allNukes, shardGameTimes, shardTickSpeeds }
   } catch (error) {
-    return { ok: 1, nukes: allNukes, shardGameTimes, shardTickSpeeds: {} }
+    return { ok: 0, nukes: allNukes, shardGameTimes, shardTickSpeeds: {}, error: error instanceof Error ? error.message : '获取 Nuke 数据失败' }
+  }
+}
+
+// 查询各 shard 动态列表（含 shardX 等新分片）
+async function getShardList(): Promise<{ name: string; tick: number; rooms?: number; users?: number }[]> {
+  const shardsInfo = await getShardsInfo()
+  if (shardsInfo.ok === 1 && Array.isArray(shardsInfo.shards) && shardsInfo.shards.length > 0) {
+    return shardsInfo.shards.map(s => ({
+      name: String(s.name),
+      tick: typeof s.tick === 'number' ? s.tick : 0,
+      rooms: typeof s.rooms === 'number' ? s.rooms : undefined,
+      users: typeof s.users === 'number' ? s.users : undefined
+    }))
+  }
+  // 兜底：官方 shards/info 不可用时返回已知列表
+  return KNOWN_SHARDS.map(name => ({ name, tick: 0 }))
+}
+
+// 房间信息查询（所有者、等级、签名、保护状态、游戏时间）
+async function getRoomInfo(roomName: string, shard: string): Promise<RoomLookupResponse> {
+  const cacheKey = `room_info_${shard}_${roomName}`
+  const cached = getCached<RoomLookupResponse>(cacheKey)
+  if (cached) return cached
+
+  try {
+    const [mapStats, gameTimeData, roomStatus] = await Promise.all([
+      api.getMapStats([roomName], shard as Shard, 'owner0'),
+      api.getGameTime(shard as Shard).catch(() => null),
+      api.getRoomStatus(roomName, shard as Shard).catch(() => null)
+    ])
+
+    if ((mapStats as any).ok !== 1) {
+      return { ok: 0, error: '地图数据不可用' }
+    }
+
+    const stats = (mapStats as any).stats?.[roomName]
+    if (!stats) {
+      return { ok: 0, error: '房间不存在或数据不可用' }
+    }
+
+    let ownerUsername: string | null = null
+    let ownerLevel: number | null = null
+    if (stats.own) {
+      const userId = typeof stats.own === 'object' ? stats.own.user : stats.own
+      ownerLevel = typeof stats.own === 'object' ? (stats.own.level ?? null) : null
+      ownerUsername = (userId && (mapStats as any).users?.[userId]?.username) || null
+    }
+
+    const sign = stats.sign && stats.sign.text
+      ? {
+          username: (mapStats as any).users?.[stats.sign.user]?.username,
+          text: stats.sign.text,
+          time: stats.sign.time
+        }
+      : null
+
+    // roomStatus 运行时可能是数组或单对象，做防御性处理
+    let statusData: any = (roomStatus as any)?.rooms
+    if (Array.isArray(statusData)) statusData = statusData[0] ?? null
+
+    const result: RoomLookupResponse = {
+      ok: 1,
+      room: {
+        name: roomName,
+        shard,
+        ownerUsername,
+        ownerLevel,
+        sign,
+        status: stats.status || statusData?.status || undefined,
+        novice: statusData?.novice ?? null,
+        respawnArea: statusData?.respawnArea ?? null,
+        gameTime: typeof gameTimeData?.time === 'number' ? gameTimeData.time : undefined
+      }
+    }
+    setCache(cacheKey, result)
+    return result
+  } catch (error) {
+    return { ok: 0, error: error instanceof Error ? error.message : '查询房间信息失败' }
   }
 }
 
@@ -461,8 +543,78 @@ export async function GET(request: NextRequest) {
     }
 
     if (action === 'nukes') {
-      const result = await getNukes(['shard0', 'shard1', 'shard2', 'shard3'])
+      // 动态获取 shard 列表，自动覆盖 shardX 等新分片
+      const shardList = (await getShardList()).map(s => s.name)
+      const result = await getNukes(shardList)
       return NextResponse.json(result)
+    }
+
+    if (action === 'shards') {
+      const shards = sortShards(await getShardList().then(list => list.map(s => s.name)))
+      const info = await getShardsInfo()
+      const details = shards.map(name => {
+        const found = info.ok === 1 ? info.shards?.find(s => String(s.name) === name) : undefined
+        return {
+          name,
+          tick: typeof found?.tick === 'number' ? found.tick : 0,
+          rooms: typeof found?.rooms === 'number' ? found.rooms : undefined,
+          users: typeof found?.users === 'number' ? found.users : undefined
+        }
+      })
+      return NextResponse.json({ ok: 1, shards: details })
+    }
+
+    if (action === 'room') {
+      const room = searchParams.get('room')
+      const shard = searchParams.get('shard') || 'shard0'
+      if (!room) {
+        return NextResponse.json({ ok: 0, error: 'Missing room parameter' }, { status: 400 })
+      }
+      const result = await getRoomInfo(room, shard)
+      return NextResponse.json(result)
+    }
+
+    if (action === 'market') {
+      const mode = searchParams.get('mode') || 'index'
+      const shard = searchParams.get('shard') || 'shard0'
+
+      if (mode === 'index') {
+        const data = await api.getMarketOrdersIndex(shard as Shard)
+        if ((data as any).ok !== 1) {
+          return NextResponse.json({ ok: 0, shard, list: [], error: '获取市场数据失败' })
+        }
+        const list = ((data as any).list || []).map((item: any) => ({
+          _id: String(item._id),
+          count: item.count || 0,
+          avgPrice: item.avgPrice || 0,
+          stddevPrice: item.stddevPrice || 0
+        }))
+        return NextResponse.json({ ok: 1, shard, list })
+      }
+
+      if (mode === 'orders') {
+        const resourceType = searchParams.get('resource')
+        if (!resourceType) {
+          return NextResponse.json({ ok: 0, error: 'Missing resource parameter' }, { status: 400 })
+        }
+        // pixel 等全局资源不区分 shard
+        const isGlobal = GLOBAL_MARKET_RESOURCES.includes(resourceType)
+        const data = await api.getOrdersByResourceType(resourceType as any, isGlobal ? undefined : (shard as Shard))
+        if ((data as any).ok !== 1) {
+          return NextResponse.json({ ok: 0, resourceType, shard, orders: [], error: '获取订单失败' })
+        }
+        const orders = ((data as any).list || []).map((o: any) => ({
+          _id: String(o._id),
+          type: o.type === 'buy' ? 'buy' : 'sell',
+          amount: o.amount || 0,
+          remainingAmount: o.remainingAmount || 0,
+          price: o.price || 0,
+          roomName: o.roomName || ''
+        }))
+        return NextResponse.json({ ok: 1, resourceType, shard: isGlobal ? undefined : shard, orders })
+      }
+
+      return NextResponse.json({ ok: 0, error: 'Invalid market mode' }, { status: 400 })
     }
 
     if (action === 'pvp') {
